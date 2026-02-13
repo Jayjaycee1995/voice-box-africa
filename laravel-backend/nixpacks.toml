@@ -1,7 +1,7 @@
 # Configuration for Railway/Nixpacks to ensure stability
-# Explicitly defining packages avoids installing unnecessary tools like Caddy (which was crashing)
+# API Only Backend - No Node/Vite build needed
 
-providers = ["php", "node"]
+providers = ["php"]
 
 [phases.setup]
 nixPkgs = [
@@ -13,18 +13,14 @@ nixPkgs = [
     "php82Extensions.tokenizer",
     "php82Extensions.xml",
     "composer", 
-    "nginx", 
-    "nodejs_20", 
-    "npm-9_x"
+    "nginx"
 ]
 
 [phases.install]
 cmds = [
-    "composer install --no-dev --optimize-autoloader",
-    "npm install"
+    "composer install --no-dev --optimize-autoloader"
 ]
 
 [phases.build]
-cmds = ["npm run build"]
-
-# We rely on the default start command for PHP provider, which should use Nginx since we installed it.
+cmds = [] 
+# No build command needed for API-only Laravel
