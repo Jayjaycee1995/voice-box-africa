@@ -324,7 +324,7 @@ const MessagesView = () => {
                         className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm ${
                           Number(message.sender_id) === Number(user?.id)
                             ? 'bg-primary text-primary-foreground rounded-br-none'
-                            : 'bg-white text-foreground border rounded-bl-none'
+                            : 'bg-card text-foreground border rounded-bl-none'
                         }`}
                       >
                         <p className="text-sm leading-relaxed">{message.content}</p>

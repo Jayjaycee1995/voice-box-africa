@@ -58,12 +58,32 @@ const ProjectsView = ({ role }: { role: 'client' | 'talent' }) => {
           if (!isMounted) return;
           const proposals: Proposal[] = response.data;
           // Map proposals to gig format for the view
-          const mappedGigs: TalentGig[] = proposals.map((p) => ({
-            ...p.gig,
-            proposal_status: p.status,
-            bid_amount: p.bid_price,
-            client: p.client
-          }));
+          const mappedGigs: TalentGig[] = proposals.map((p) => {
+            // Safety check for deleted gigs
+            if (!p.gig) {
+              return {
+                id: p.gig_id,
+                title: 'Unknown Project',
+                description: 'This project may have been deleted',
+                budget: p.bid_price,
+                deadline: new Date().toISOString(),
+                status: 'closed',
+                created_at: p.created_at,
+                client_id: '',
+                category: 'Unknown',
+                proposal_status: p.status,
+                bid_amount: p.bid_price,
+                client: p.client
+              } as TalentGig;
+            }
+            
+            return {
+              ...p.gig,
+              proposal_status: p.status,
+              bid_amount: p.bid_price,
+              client: p.client
+            };
+          });
           setProjects(mappedGigs);
         }
       } catch (error) {

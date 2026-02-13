@@ -72,10 +72,10 @@ const Header = () => {
   return (
     <header 
       className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out border-b",
+        "fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out border-b bg-background",
         scrolled 
-          ? "bg-background/80 backdrop-blur-lg border-border py-2" 
-          : "bg-background/50 backdrop-blur-sm border-transparent py-4"
+          ? "shadow-lg py-2 border-border" 
+          : "border-transparent py-4"
       )}
     >
       <div className="container mx-auto px-4 lg:px-8">
@@ -98,7 +98,7 @@ const Header = () => {
               <NavigationMenuList className="gap-1">
                 {/* Find Talent */}
                 <NavigationMenuItem>
-                  <NavigationMenuTrigger className="bg-transparent hover:bg-primary/5 data-[state=open]:bg-primary/5 font-medium text-[15px]">
+                  <NavigationMenuTrigger className="bg-transparent hover:bg-primary/5 data-[state=open]:bg-primary/5 font-medium text-[15px] dark:hover:bg-primary/10 dark:data-[state=open]:bg-primary/10 dark:hover:backdrop-blur-md dark:hover:bg-opacity-20 dark:border dark:border-transparent dark:hover:border-primary/20 transition-all duration-200">
                     Find Talent
                   </NavigationMenuTrigger>
                   <NavigationMenuContent>
@@ -139,7 +139,7 @@ const Header = () => {
 
                 {/* Find Work */}
                 <NavigationMenuItem>
-                  <NavigationMenuTrigger className="bg-transparent hover:bg-primary/5 data-[state=open]:bg-primary/5 font-medium text-[15px]">
+                  <NavigationMenuTrigger className="bg-transparent hover:bg-primary/5 data-[state=open]:bg-primary/5 font-medium text-[15px] dark:hover:bg-primary/10 dark:data-[state=open]:bg-primary/10 dark:hover:backdrop-blur-md dark:hover:bg-opacity-20 dark:border dark:border-transparent dark:hover:border-primary/20 transition-all duration-200">
                     Find Work
                   </NavigationMenuTrigger>
                   <NavigationMenuContent>
@@ -181,7 +181,7 @@ const Header = () => {
                     to="/how-it-works" 
                     className={cn(
                       navigationMenuTriggerStyle(), 
-                      "bg-transparent font-medium text-[15px] hover:bg-primary/5"
+                      "bg-transparent font-medium text-[15px] hover:bg-primary/5 dark:hover:bg-primary/10 dark:hover:backdrop-blur-md dark:hover:bg-opacity-20 dark:border dark:border-transparent dark:hover:border-primary/20 transition-all duration-200"
                     )}
                   >
                     How It Works
@@ -205,7 +205,7 @@ const Header = () => {
                 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="pl-1 pr-2 gap-2 hover:bg-primary/5 h-10 transition-all rounded-full border border-transparent hover:border-border">
+                    <Button variant="ghost" className="pl-1 pr-2 gap-2 hover:bg-primary/5 h-10 transition-all rounded-full border border-transparent hover:border-border dark:hover:bg-primary/10 dark:hover:backdrop-blur-md dark:hover:bg-opacity-20 dark:hover:border-primary/20">
                       <Avatar className="h-8 w-8 ring-2 ring-transparent group-hover:ring-primary/20 transition-all">
                         <AvatarImage src={user?.profile_image} />
                         <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs">
@@ -252,10 +252,10 @@ const Header = () => {
               </div>
             ) : (
               <div className="flex items-center gap-3 ml-2 animate-in fade-in duration-500">
-                <Button variant="ghost" asChild className="font-semibold text-[15px] hover:bg-primary/5 px-6">
+                <Button variant="ghost" asChild className="font-semibold text-[15px] hover:bg-primary/5 px-6 dark:hover:bg-primary/10 dark:hover:backdrop-blur-md dark:hover:bg-opacity-20 dark:border dark:border-transparent dark:hover:border-primary/20 transition-all duration-200">
                   <Link to="/login">Log In</Link>
                 </Button>
-                <Button variant="hero" asChild className="px-6 shadow-md hover:shadow-xl transition-all active:scale-95 font-semibold">
+                <Button variant="hero" asChild className="px-6 shadow-md hover:shadow-xl transition-all active:scale-95 font-semibold dark:hover:bg-primary/90 dark:hover:backdrop-blur-sm">
                   <Link to="/register">Join Free</Link>
                 </Button>
               </div>
