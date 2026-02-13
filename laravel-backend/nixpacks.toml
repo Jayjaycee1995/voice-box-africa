@@ -1,5 +1,22 @@
-# Configuration for Railway/Nixpacks
-# We override the install phase to force NPM instead of Bun
+# Configuration for Railway/Nixpacks to ensure stability
+# Explicitly defining packages avoids installing unnecessary tools like Caddy (which was crashing)
+
+providers = ["php", "node"]
+
+[phases.setup]
+nixPkgs = [
+    "php82", 
+    "php82Extensions.pgsql", 
+    "php82Extensions.pdo_pgsql", 
+    "php82Extensions.bcmath", 
+    "php82Extensions.fileinfo",
+    "php82Extensions.tokenizer",
+    "php82Extensions.xml",
+    "composer", 
+    "nginx", 
+    "nodejs_20", 
+    "npm-9_x"
+]
 
 [phases.install]
 cmds = [
@@ -9,3 +26,5 @@ cmds = [
 
 [phases.build]
 cmds = ["npm run build"]
+
+# We rely on the default start command for PHP provider, which should use Nginx since we installed it.
