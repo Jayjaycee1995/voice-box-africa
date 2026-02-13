@@ -1,0 +1,11 @@
+# Configuration for Railway/Nixpacks
+# We override the install phase to force NPM instead of Bun
+
+[phases.install]
+cmds = [
+    "composer install --no-dev --optimize-autoloader",
+    "npm install"
+]
+
+[phases.build]
+cmds = ["npm run build"]
