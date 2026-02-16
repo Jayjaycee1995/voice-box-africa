@@ -1,16 +1,14 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, SlidersHorizontal, X, Clock, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Gig } from "@/lib/database.types";
-import api from "@/lib/axios";
+import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useToast } from "@/hooks/use-toast";
-
-// Mock gig data removed, fetching from API
 
 const languages = [
   "All Languages",
@@ -43,7 +41,6 @@ const budgetRanges = [
 ];
 
 const BrowseGigs = () => {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const { isAuthenticated, user } = useAuthStore();
   const [gigs, setGigs] = useState<Gig[]>([]);
@@ -59,13 +56,55 @@ const BrowseGigs = () => {
     let isMounted = true;
     const fetchGigs = async () => {
       try {
-        const response = await api.get('/gigs');
+        const { data: publicGigs, error } = await supabase
+          .from('gigs')
+          .select('*')
+          .eq('status', 'open')
+          .eq('visibility', 'public')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
         if (isMounted) {
-          setGigs(response.data);
+          setGigs((publicGigs as unknown as Gig[]) ?? []);
+        }
+
+        if (user?.role !== "talent") return;
+
+        const { data: invitations, error: invError } = await supabase
+          .from("invitations")
+          .select(`
+            gig:gigs(*)
+          `)
+          .eq("talent_id", user.id);
+
+        if (invError) throw invError;
+
+        const invitedGigs = (invitations as unknown as Array<{ gig?: Gig | null }> | null)
+          ?.map((i) => i.gig)
+          .filter((g): g is Gig => Boolean(g))
+          .filter((g) => g.status === "open") ?? [];
+
+        if (isMounted && invitedGigs.length > 0) {
+          setGigs((prev) => {
+            const byId = new Map(prev.map((g) => [g.id, g]));
+            invitedGigs.forEach((g) => byId.set(g.id, g));
+            return Array.from(byId.values()).sort((a, b) => {
+              const aTime = new Date(a.created_at).getTime();
+              const bTime = new Date(b.created_at).getTime();
+              return bTime - aTime;
+            });
+          });
         }
       } catch (error) {
         if (isMounted) {
           console.error("Failed to fetch gigs", error);
+          const errorMessage = error instanceof Error ? error.message : "Failed to load gigs.";
+          toast({
+            title: "Error",
+            description: errorMessage,
+            variant: "destructive",
+          });
         }
       } finally {
         if (isMounted) {
@@ -77,7 +116,7 @@ const BrowseGigs = () => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [toast, user?.id, user?.role]);
 
   const filteredGigs = gigs.filter((gig) => {
     const matchesSearch =
@@ -272,8 +311,12 @@ const BrowseGigs = () => {
               </div>
             ) : (
               <>
-                {filteredGigs.map((gig) => (
-                  <div key={gig.id} className="card-elevated p-6 rounded-xl">
+                {filteredGigs.map((gig, index) => (
+                  <div
+                    key={gig.id}
+                    className="card-elevated p-6 rounded-xl animate-slide-up"
+                    style={{ animationDelay: `${index * 0.04}s` }}
+                  >
                     <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
@@ -321,16 +364,6 @@ const BrowseGigs = () => {
                         {(!isAuthenticated || user?.role === 'talent') && (
                           <Button 
                             className="btn-gradient" 
-                            onClick={(e) => {
-                              if (!isAuthenticated) {
-                                e.preventDefault();
-                                toast({
-                                  title: "Authentication required",
-                                  description: "Please log in to submit a proposal.",
-                                });
-                                navigate("/login");
-                              }
-                            }}
                             asChild
                           >
                             <Link to={`/submit-proposal/${gig.id}`}>

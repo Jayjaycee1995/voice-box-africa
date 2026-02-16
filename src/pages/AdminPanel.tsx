@@ -1,21 +1,16 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { 
   LayoutDashboard, 
   Users, 
   FileText, 
-  ShieldAlert, 
-  Settings, 
   LogOut, 
   Search, 
   Bell,
   Menu,
   MoreVertical,
-  CheckCircle2,
-  XCircle,
-  TrendingUp,
-  DollarSign,
-  Activity
+  Activity,
+  Mic
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuthStore } from "@/store/useAuthStore";
+import { supabase } from "@/lib/supabase";
 import voiboxLogo from "@/assets/voibox-logo.png";
 import {
   DropdownMenu,
@@ -40,34 +36,107 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-// Mock Data
-const stats = [
-  { label: "Total Revenue", value: "$45,231", icon: DollarSign, change: "+20.1%", trend: "up" },
-  { label: "Active Users", value: "2,350", icon: Users, change: "+180", trend: "up" },
-  { label: "Active Gigs", value: "1,203", icon: FileText, change: "+19%", trend: "up" },
-  { label: "Disputes", value: "12", icon: ShieldAlert, change: "-4%", trend: "down" },
-];
-
-const recentUsers = [
-  { id: 1, name: "Amara Okonkwo", role: "talent", status: "verified", date: "2 mins ago" },
-  { id: 2, name: "John Doe", role: "client", status: "active", date: "1 hour ago" },
-  { id: 3, name: "Chinedu A.", role: "talent", status: "pending", date: "3 hours ago" },
-  { id: 4, name: "Acme Corp", role: "client", status: "active", date: "5 hours ago" },
-  { id: 5, name: "Sarah Smith", role: "talent", status: "rejected", date: "1 day ago" },
-];
-
 export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState("overview");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { user, logout } = useAuthStore();
+  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState([
+    { label: "Total Users", value: "0", icon: Users, color: "bg-blue-100 text-blue-700" },
+    { label: "Clients", value: "0", icon: FileText, color: "bg-purple-100 text-purple-700" },
+    { label: "Talents", value: "0", icon: Mic, color: "bg-green-100 text-green-700" },
+    { label: "Open Gigs", value: "0", icon: Activity, color: "bg-yellow-100 text-yellow-700" },
+  ]);
+  const [recentUsers, setRecentUsers] = useState<
+    Array<{ id: string; name: string; email: string; role: string; created_at: string; profile_image: string | null }>
+  >([]);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      navigate("/", { replace: true });
+    }
+  };
 
   const navItems = [
     { id: "overview", label: "Overview", icon: LayoutDashboard },
     { id: "users", label: "Users", icon: Users },
-    { id: "gigs", label: "Gigs & Proposals", icon: FileText },
-    { id: "disputes", label: "Disputes", icon: ShieldAlert },
-    { id: "settings", label: "Settings", icon: Settings },
   ];
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchAsync = async () => {
+      setIsLoading(true);
+
+      try {
+        const { data: usersData, error: usersError } = await supabase
+          .from("users")
+          .select("id, name, email, role, created_at, profile_image")
+          .order("created_at", { ascending: false })
+          .limit(20);
+
+        if (usersError) throw usersError;
+
+        const users = (usersData ?? []) as Array<{
+          id: string;
+          name: string | null;
+          email: string;
+          role: "client" | "talent" | "admin";
+          created_at: string;
+          profile_image: string | null;
+        }>;
+
+        const clients = users.filter((u) => u.role === "client").length;
+        const talents = users.filter((u) => u.role === "talent").length;
+
+        const { data: gigsData, error: gigsError } = await supabase
+          .from("gigs")
+          .select("id, status");
+
+        if (gigsError) throw gigsError;
+
+        const gigs = (gigsData ?? []) as Array<{ id: number; status: "open" | "assigned" | "completed" | "cancelled" }>;
+        const openGigs = gigs.filter((g) => g.status === "open").length;
+
+        if (!isMounted) return;
+        setRecentUsers(users.map((u) => ({
+          id: u.id,
+          name: u.name || u.email,
+          email: u.email,
+          role: u.role,
+          created_at: u.created_at,
+          profile_image: u.profile_image,
+        })));
+
+        setStats([
+          { label: "Total Users", value: String(users.length), icon: Users, color: "bg-blue-100 text-blue-700" },
+          { label: "Clients", value: String(clients), icon: FileText, color: "bg-purple-100 text-purple-700" },
+          { label: "Talents", value: String(talents), icon: Mic, color: "bg-green-100 text-green-700" },
+          { label: "Open Gigs", value: String(openGigs), icon: Activity, color: "bg-yellow-100 text-yellow-700" },
+        ]);
+      } catch (e) {
+        if (!isMounted) return;
+        setRecentUsers([]);
+        setStats([
+          { label: "Total Users", value: "0", icon: Users, color: "bg-blue-100 text-blue-700" },
+          { label: "Clients", value: "0", icon: FileText, color: "bg-purple-100 text-purple-700" },
+          { label: "Talents", value: "0", icon: Mic, color: "bg-green-100 text-green-700" },
+          { label: "Open Gigs", value: "0", icon: Activity, color: "bg-yellow-100 text-yellow-700" },
+        ]);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    fetchAsync();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <div className="flex h-screen bg-muted/30 overflow-hidden">
@@ -106,7 +175,7 @@ export default function AdminPanel() {
         </ScrollArea>
 
         <div className="p-4 border-t border-white/10">
-          <button onClick={() => logout()} className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-white/70 hover:bg-white/10 hover:text-white transition-colors">
+          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-white/70 hover:bg-white/10 hover:text-white transition-colors">
             <LogOut className="w-5 h-5" />
             {sidebarOpen && <span>Logout</span>}
           </button>
@@ -131,7 +200,6 @@ export default function AdminPanel() {
              </div>
              <Button variant="ghost" size="icon" className="relative">
                <Bell className="w-5 h-5" />
-               <span className="absolute top-2 right-2 w-2 h-2 bg-destructive rounded-full" />
              </Button>
              <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -144,7 +212,7 @@ export default function AdminPanel() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => logout()}>Logout</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
                 </DropdownMenuContent>
              </DropdownMenu>
           </div>
@@ -160,13 +228,9 @@ export default function AdminPanel() {
                    <Card key={stat.label}>
                      <CardContent className="p-6">
                        <div className="flex items-center justify-between mb-4">
-                         <div className={`p-3 rounded-full ${stat.trend === 'up' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                         <div className={`p-3 rounded-full ${stat.color}`}>
                            <stat.icon className="w-5 h-5" />
                          </div>
-                         <Badge variant={stat.trend === 'up' ? 'default' : 'destructive'} className="gap-1">
-                           {stat.change} 
-                           <TrendingUp className={`w-3 h-3 ${stat.trend === 'down' && 'rotate-180'}`} />
-                         </Badge>
                        </div>
                        <div className="space-y-1">
                          <p className="text-sm text-muted-foreground">{stat.label}</p>
@@ -177,53 +241,36 @@ export default function AdminPanel() {
                  ))}
                </div>
 
-               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                 {/* Activity Chart Placeholder */}
-                 <Card className="lg:col-span-2">
-                   <CardHeader>
-                     <CardTitle>Platform Activity</CardTitle>
-                     <CardDescription>User registrations and Gig postings over time</CardDescription>
-                   </CardHeader>
-                   <CardContent>
-                     <div className="h-[300px] w-full bg-muted/20 rounded-lg flex items-center justify-center border border-dashed">
-                       <div className="text-center text-muted-foreground">
-                          <Activity className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                          <p>Activity Chart Visualization</p>
-                       </div>
-                     </div>
-                   </CardContent>
-                 </Card>
-
-                 {/* Recent Users */}
+               <div className="grid grid-cols-1 gap-6">
                  <Card>
                    <CardHeader>
                      <CardTitle>Recent Registrations</CardTitle>
                      <CardDescription>Latest users joining the platform</CardDescription>
                    </CardHeader>
                    <CardContent>
-                     <div className="space-y-4">
-                       {recentUsers.map((u) => (
-                         <div key={u.id} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-lg transition-colors">
-                            <div className="flex items-center gap-3">
-                              <Avatar className="w-9 h-9">
-                                <AvatarFallback>{u.name.charAt(0)}</AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <p className="text-sm font-medium">{u.name}</p>
-                                <p className="text-xs text-muted-foreground capitalize">{u.role}</p>
-                              </div>
-                            </div>
-                            <Badge variant="outline" className={`
-                              ${u.status === 'verified' && 'bg-green-100 text-green-700 border-green-200'}
-                              ${u.status === 'active' && 'bg-blue-100 text-blue-700 border-blue-200'}
-                              ${u.status === 'pending' && 'bg-yellow-100 text-yellow-700 border-yellow-200'}
-                              ${u.status === 'rejected' && 'bg-red-100 text-red-700 border-red-200'}
-                            `}>
-                              {u.status}
-                            </Badge>
-                         </div>
-                       ))}
-                     </div>
+                     {isLoading ? (
+                       <div className="py-6 text-center text-muted-foreground">Loading...</div>
+                     ) : recentUsers.length === 0 ? (
+                       <div className="py-6 text-center text-muted-foreground">No users found.</div>
+                     ) : (
+                       <div className="space-y-4">
+                         {recentUsers.slice(0, 5).map((u) => (
+                           <div key={u.id} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-lg transition-colors">
+                             <div className="flex items-center gap-3">
+                               <Avatar className="w-9 h-9">
+                                 <AvatarImage src={u.profile_image || undefined} />
+                                 <AvatarFallback>{u.name.charAt(0).toUpperCase()}</AvatarFallback>
+                               </Avatar>
+                               <div>
+                                 <p className="text-sm font-medium">{u.name}</p>
+                                 <p className="text-xs text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</p>
+                               </div>
+                             </div>
+                             <Badge variant="secondary" className="capitalize">{u.role}</Badge>
+                           </div>
+                         ))}
+                       </div>
+                     )}
                    </CardContent>
                  </Card>
                </div>
@@ -242,25 +289,27 @@ export default function AdminPanel() {
                      <TableRow>
                        <TableHead>User</TableHead>
                        <TableHead>Role</TableHead>
-                       <TableHead>Status</TableHead>
                        <TableHead>Joined</TableHead>
                        <TableHead className="text-right">Actions</TableHead>
                      </TableRow>
                    </TableHeader>
                    <TableBody>
-                     {recentUsers.map((u) => (
+                    {recentUsers.map((u) => (
                        <TableRow key={u.id}>
                          <TableCell className="font-medium">
                            <div className="flex items-center gap-2">
-                             <Avatar className="w-8 h-8"><AvatarFallback>{u.name.charAt(0)}</AvatarFallback></Avatar>
-                             {u.name}
+                            <Avatar className="w-8 h-8">
+                              <AvatarImage src={u.profile_image || undefined} />
+                              <AvatarFallback>{u.name.charAt(0).toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                              <div className="truncate">{u.name}</div>
+                              <div className="text-xs text-muted-foreground truncate">{u.email}</div>
+                            </div>
                            </div>
                          </TableCell>
                          <TableCell className="capitalize">{u.role}</TableCell>
-                         <TableCell>
-                           <Badge variant="secondary" className="capitalize">{u.status}</Badge>
-                         </TableCell>
-                         <TableCell>{u.date}</TableCell>
+                        <TableCell>{new Date(u.created_at).toLocaleDateString()}</TableCell>
                          <TableCell className="text-right">
                            <Button variant="ghost" size="icon"><MoreVertical className="w-4 h-4" /></Button>
                          </TableCell>
@@ -273,13 +322,6 @@ export default function AdminPanel() {
           )}
 
           {/* Other tabs can be implemented similarly */}
-          {(activeTab === 'gigs' || activeTab === 'disputes' || activeTab === 'settings') && (
-            <div className="flex flex-col items-center justify-center h-[60vh] text-muted-foreground animate-in fade-in duration-500">
-               <Settings className="w-12 h-12 mb-4 opacity-20" />
-               <h3 className="text-lg font-medium">Coming Soon</h3>
-               <p>This module is under development.</p>
-            </div>
-          )}
         </main>
       </div>
     </div>

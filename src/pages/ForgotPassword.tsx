@@ -6,14 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Mic2, Mail, ArrowLeft, CheckCircle2, AlertCircle } from "lucide-react";
-import api from "@/lib/axios";
+import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [devToken, setDevToken] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -21,20 +20,22 @@ const ForgotPassword = () => {
     setIsLoading(true);
     
     try {
-      const response = await api.post('/forgot-password', { email });
-      // For development, capture the token
-      if (response.data.dev_token) {
-        setDevToken(response.data.dev_token);
-      }
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      
+      if (error) throw error;
+      
       setIsSubmitted(true);
       toast({
         title: "Reset link sent",
         description: "Please check your email for the reset link.",
       });
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to send reset link. Please try again.";
       toast({
         title: "Error",
-        description: error.response?.data?.message || "Failed to send reset link. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -78,19 +79,7 @@ const ForgotPassword = () => {
                   </p>
                 </div>
                 
-                {/* DEV ONLY: Show token link */}
-                {devToken && (
-                  <div className="bg-yellow-100 dark:bg-yellow-900/30 p-4 rounded-lg text-sm">
-                    <p className="font-bold text-yellow-800 dark:text-yellow-200 mb-2">Development Mode:</p>
-                    <p className="mb-2">Since email is not configured, click here to reset:</p>
-                    <Link 
-                      to={`/reset-password?token=${devToken}&email=${email}`}
-                      className="text-primary underline font-medium break-all"
-                    >
-                      Reset Password Link
-                    </Link>
-                  </div>
-                )}
+                
 
                 <div className="text-sm text-muted-foreground">
                   <p>Didn't receive the email?</p>

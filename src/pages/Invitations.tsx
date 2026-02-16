@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import DashboardHeader from "@/components/layout/DashboardHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, Clock, User, MessageSquare, CheckCircle, XCircle, Clock4, Loader2 } from "lucide-react";
-import api from "@/lib/axios";
+import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useToast } from "@/hooks/use-toast";
 
@@ -35,53 +35,51 @@ interface Invitation {
   };
 }
 
-// Mock invitation data removed
-
 const Invitations = () => {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuthStore();
   const { toast } = useToast();
 
-  useEffect(() => {
-    let isMounted = true;
-    const fetchInvitations = async () => {
-      try {
-        const response = await api.get('/invitations');
-        if (isMounted) {
-          setInvitations(response.data);
-        }
-      } catch (error) {
-        if (isMounted) {
-          console.error("Failed to fetch invitations", error);
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    fetchInvitations();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const fetchInvitations = async () => {
+  const fetchInvitations = useCallback(async () => {
+    if (!user) return;
     try {
-      const response = await api.get('/invitations');
-      setInvitations(response.data);
+      const { data, error } = await supabase
+        .from('invitations')
+        .select(`
+          *,
+          gig:gigs(id, title, budget),
+          client:client_id(id, name, profile_image),
+          talent:talent_id(id, name, profile_image)
+        `)
+        .or(`client_id.eq.${user.id},talent_id.eq.${user.id}`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      // Transform data to match Invitation interface structure if needed
+      // But based on select query, it should match the structure expected by the UI
+      // providing we cast it properly or the interface is flexible enough
+      setInvitations(data as unknown as Invitation[]);
     } catch (error) {
       console.error("Failed to fetch invitations", error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    fetchInvitations();
+  }, [fetchInvitations]);
 
   const handleAction = async (id: string | number, status: 'accepted' | 'declined') => {
     try {
-      await api.put(`/invitations/${id}`, { status });
+      const { error } = await supabase
+        .from('invitations')
+        .update({ status })
+        .eq('id', id);
+
+      if (error) throw error;
       toast({ title: "Success", description: `Invitation ${status}` });
       fetchInvitations();
     } catch (error) {

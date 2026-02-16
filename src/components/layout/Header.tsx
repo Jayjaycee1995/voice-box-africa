@@ -36,7 +36,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import voiboxLogo from "@/assets/voibox-logo.png";
 import { useAuthStore } from "@/store/useAuthStore";
 import { cn } from "@/lib/utils";
-import { ModeToggle } from "@/components/mode-toggle";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -55,19 +54,23 @@ const Header = () => {
 
   const handleProtectedAction = (path: string) => {
     if (!isAuthenticated) {
-      navigate("/login");
+      navigate("/login", { state: { from: path } });
       return;
     }
     navigate(path);
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate("/");
-    setIsMenuOpen(false);
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      navigate("/", { replace: true });
+      setIsMenuOpen(false);
+    }
   };
 
-  const dashboardLink = user?.role === 'client' ? '/client-dashboard' : '/talent-dashboard';
+  const dashboardLink =
+    user?.role === 'client' ? '/client-dashboard' : user?.role === 'talent' ? '/talent-dashboard' : '/admin';
 
   return (
     <header 
@@ -107,14 +110,14 @@ const Header = () => {
                         <NavigationMenuLink asChild>
                           <Link 
                             to="/artists" 
-                            className="flex items-start gap-3 p-3 hover:bg-accent rounded-lg transition-all group"
+                            className="flex items-start gap-3 p-3 rounded-lg transition-all group hover:bg-primary/10 dark:hover:bg-primary/15"
                           >
                             <div className="mt-1 bg-primary/10 p-2 rounded-md group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                               <Users className="w-4 h-4" />
                             </div>
                             <div>
-                              <div className="text-sm font-semibold">Browse Voice Artists</div>
-                              <p className="text-xs text-muted-foreground mt-0.5">Find the perfect voice for your project from 1000+ talents.</p>
+                              <div className="text-sm font-semibold text-foreground group-hover:text-foreground">Browse Voice Artists</div>
+                              <p className="text-xs text-muted-foreground mt-0.5 group-hover:text-foreground/70">Find the perfect voice for your project from 1000+ talents.</p>
                             </div>
                           </Link>
                         </NavigationMenuLink>
@@ -122,14 +125,14 @@ const Header = () => {
                       <div className="grid gap-1">
                         <button
                           onClick={() => handleProtectedAction("/post-gig")}
-                          className="flex items-start gap-3 p-3 hover:bg-accent rounded-lg transition-all group w-full text-left"
+                          className="flex items-start gap-3 p-3 rounded-lg transition-all group w-full text-left hover:bg-primary/10 dark:hover:bg-primary/15"
                         >
                           <div className="mt-1 bg-primary/10 p-2 rounded-md group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                             <Mic className="w-4 h-4" />
                           </div>
                           <div>
-                            <div className="text-sm font-semibold">Post a Project</div>
-                            <p className="text-xs text-muted-foreground mt-0.5">Share your requirements and get custom auditions fast.</p>
+                            <div className="text-sm font-semibold text-foreground group-hover:text-foreground">Post a Project</div>
+                            <p className="text-xs text-muted-foreground mt-0.5 group-hover:text-foreground/70">Share your requirements and get custom auditions fast.</p>
                           </div>
                         </button>
                       </div>
@@ -145,30 +148,30 @@ const Header = () => {
                   <NavigationMenuContent>
                     <div className="p-4 w-[320px] grid gap-4 animate-in fade-in zoom-in-95 duration-200">
                       <div className="grid gap-1">
-                        <button
-                          onClick={() => handleProtectedAction("/browse-gigs")}
-                          className="flex items-start gap-3 p-3 hover:bg-accent rounded-lg transition-all group w-full text-left"
+                        <Link
+                          to="/browse-gigs"
+                          className="flex items-start gap-3 p-3 rounded-lg transition-all group w-full text-left hover:bg-primary/10 dark:hover:bg-primary/15"
                         >
                           <div className="mt-1 bg-primary/10 p-2 rounded-md group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                             <Briefcase className="w-4 h-4" />
                           </div>
                           <div>
-                            <div className="text-sm font-semibold">Browse Gigs</div>
-                            <p className="text-xs text-muted-foreground mt-0.5">Explore open projects and submit your best proposals.</p>
+                            <div className="text-sm font-semibold text-foreground group-hover:text-foreground">Browse Gigs</div>
+                            <p className="text-xs text-muted-foreground mt-0.5 group-hover:text-foreground/70">Explore open projects and submit your best proposals.</p>
                           </div>
-                        </button>
+                        </Link>
                       </div>
                       <div className="grid gap-1">
                         <button
                           onClick={() => handleProtectedAction("/invitations")}
-                          className="flex items-start gap-3 p-3 hover:bg-accent rounded-lg transition-all group w-full text-left"
+                          className="flex items-start gap-3 p-3 rounded-lg transition-all group w-full text-left hover:bg-primary/10 dark:hover:bg-primary/15"
                         >
                           <div className="mt-1 bg-primary/10 p-2 rounded-md group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                             <Bell className="w-4 h-4" />
                           </div>
                           <div>
-                            <div className="text-sm font-semibold">My Invitations</div>
-                            <p className="text-xs text-muted-foreground mt-0.5">View direct project invitations from interested clients.</p>
+                            <div className="text-sm font-semibold text-foreground group-hover:text-foreground">My Invitations</div>
+                            <p className="text-xs text-muted-foreground mt-0.5 group-hover:text-foreground/70">View direct project invitations from interested clients.</p>
                           </div>
                         </button>
                       </div>
@@ -193,7 +196,6 @@ const Header = () => {
 
           {/* Desktop Actions */}
           <div className="hidden lg:flex items-center gap-3">
-            <ModeToggle />
             
             {isAuthenticated ? (
               <div className="flex items-center gap-2 pl-2 border-l border-border ml-2">
@@ -264,7 +266,6 @@ const Header = () => {
 
           {/* Mobile Menu Button */}
           <div className="flex items-center gap-3 lg:hidden">
-            <ModeToggle />
             <button
               className="p-2.5 text-foreground hover:bg-accent rounded-full transition-all active:scale-90 border border-border/50 shadow-sm"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -309,11 +310,9 @@ const Header = () => {
                   </div>
                   <ChevronDown className="w-5 h-5 -rotate-90 text-muted-foreground" />
                 </button>
-                <button
-                  onClick={() => {
-                    handleProtectedAction("/browse-gigs");
-                    setIsMenuOpen(false);
-                  }}
+                <Link
+                  to="/browse-gigs"
+                  onClick={() => setIsMenuOpen(false)}
                   className="px-4 py-3.5 text-lg font-semibold hover:bg-accent rounded-xl transition-all flex items-center justify-between group text-left w-full"
                 >
                   <div className="flex items-center gap-3">
@@ -323,7 +322,7 @@ const Header = () => {
                     <span>Find Work</span>
                   </div>
                   <ChevronDown className="w-5 h-5 -rotate-90 text-muted-foreground" />
-                </button>
+                </Link>
                 <Link
                   to="/how-it-works"
                   className="px-4 py-3.5 text-lg font-semibold hover:bg-accent rounded-xl transition-all flex items-center gap-3"

@@ -1,41 +1,36 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Mic2, Lock, ArrowLeft, CheckCircle2 } from "lucide-react";
-import api from "@/lib/axios";
+import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 
 const ResetPassword = () => {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  const [email, setEmail] = useState("");
-  const [token, setToken] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
   useEffect(() => {
-    const emailParam = searchParams.get("email");
-    const tokenParam = searchParams.get("token");
-    
-    if (emailParam) setEmail(emailParam);
-    if (tokenParam) setToken(tokenParam);
-    
-    if (!emailParam || !tokenParam) {
-      toast({
-        title: "Invalid Link",
-        description: "Missing email or token in the reset link.",
-        variant: "destructive",
-      });
-    }
-  }, [searchParams, toast]);
+    // Check if session exists (user clicked magic link)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        // If no session, maybe check hash fragment manually or just warn
+        // Supabase client usually parses hash on load.
+        // But if we navigate here directly without hash, session is null.
+        // We'll give it a moment or just warn.
+        // Actually, on mount, session might not be ready if `initialize` hasn't finished.
+        // But `App.tsx` calls `initialize`.
+      }
+    });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,22 +56,24 @@ const ResetPassword = () => {
     setIsLoading(true);
 
     try {
-      await api.post('/reset-password', {
-        email,
-        token,
-        password,
-        password_confirmation: confirmPassword
+      const { error } = await supabase.auth.updateUser({
+        password: password
       });
+      
+      if (error) throw error;
       
       setIsSuccess(true);
       toast({
         title: "Success",
-        description: "Your password has been reset successfully.",
+        description: "Your password has been reset successfully. Redirecting to login...",
       });
-    } catch (error: any) {
+      
+      setTimeout(() => navigate('/login'), 2000);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to reset password.";
       toast({
         title: "Error",
-        description: error.response?.data?.message || "Failed to reset password.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

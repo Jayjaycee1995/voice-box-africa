@@ -11,9 +11,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon, Upload, FileText, Loader2, ArrowRight, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import api from "@/lib/axios";
+import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/layout/DashboardHeader";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { africanLanguages } from "@/constants/languages";
@@ -39,6 +39,7 @@ export default function GigPosting() {
   const [isLoading, setIsLoading] = useState(false);
   const [isCustomLang, setIsCustomLang] = useState(false);
   const { toast } = useToast();
+  const location = useLocation();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuthStore();
   
@@ -65,7 +66,7 @@ export default function GigPosting() {
         title: "Authentication required",
         description: "Please log in to post a project.",
       });
-      navigate("/login");
+      navigate("/login", { state: { from: `${location.pathname}${location.search}`, role: "client" } });
       return;
     }
 
@@ -78,12 +79,13 @@ export default function GigPosting() {
       navigate("/talent-dashboard");
       return;
     }
-  }, [isAuthenticated, user, navigate, toast]);
+  }, [isAuthenticated, location.pathname, location.search, user, navigate, toast]);
 
   const onSubmit = async (data: GigFormValues) => {
     setIsLoading(true);
     try {
       const payload = {
+        client_id: user?.id,
         title: data.title,
         description: data.description + (data.scriptText ? `\n\nScript Snippet:\n${data.scriptText}` : ""),
         budget: data.budget || 0,
@@ -93,9 +95,11 @@ export default function GigPosting() {
         tone: data.tone,
         visibility: data.visibility,
         category: "Voice Over",
+        status: 'open',
       };
 
-      await api.post('/gigs', payload);
+      const { error } = await supabase.from('gigs').insert(payload);
+      if (error) throw error;
       
       toast({
         title: "Success",
@@ -103,11 +107,12 @@ export default function GigPosting() {
       });
       
       navigate('/client-dashboard');
-    } catch (error: any) {
+    } catch (error) {
       console.error(error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to post gig.";
       toast({
         title: "Error",
-        description: error.response?.data?.message || "Failed to post gig.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

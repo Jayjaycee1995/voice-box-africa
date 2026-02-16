@@ -1,19 +1,19 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthStore } from "@/store/useAuthStore";
-import api from "@/lib/axios";
 import { ArrowRight, Loader2, Check } from "lucide-react";
 import voiboxLogo from "@/assets/voibox-logo.png";
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
-  const { login } = useAuthStore();
+  const { login, logout } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [role, setRole] = useState<'client' | 'talent'>('client');
   const [formData, setFormData] = useState({
@@ -21,6 +21,18 @@ const Login = () => {
     password: "",
   });
   const [rememberMe, setRememberMe] = useState(!!localStorage.getItem('rememberedEmail'));
+
+  const from = typeof (location.state as { from?: unknown } | null)?.from === "string"
+    ? (location.state as { from?: string }).from
+    : null;
+
+  const roleFromState = (location.state as { role?: unknown } | null)?.role;
+
+  useEffect(() => {
+    if (roleFromState === "client" || roleFromState === "talent") {
+      setRole(roleFromState);
+    }
+  }, [roleFromState]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,36 +45,44 @@ const Login = () => {
     }
 
     try {
-      // In a real app, role might be determined by backend, but we can send it or just use it for UI context
-      const response = await api.post('/login', {
-        email: formData.email,
-        password: formData.password,
-      });
-
-      const { user, access_token } = response.data;
+      await login(formData.email, formData.password);
       
-      login(user, access_token);
+      // Get the updated user from the store
+      const user = useAuthStore.getState().user;
       
       toast({
         title: "Welcome back!",
         description: "You have successfully logged in.",
       });
 
-      // Redirect based on role (if backend returns it, otherwise use selected context or default)
-      // Assuming backend user object has 'role'
-      const userRole = user.role || role; // Fallback to selected role if not in user object (though it should be)
-      
-      if (userRole === 'client') {
-        navigate('/client-dashboard');
-      } else {
-        navigate('/talent-dashboard');
+      if (user?.role === "client" || user?.role === "talent") {
+        if (user.role !== role) {
+          await logout();
+          toast({
+            variant: "destructive",
+            title: "Wrong account type",
+            description: `This account is registered as a ${user.role}. Please switch to ${user.role} to sign in.`,
+          });
+          return;
+        }
       }
-    } catch (error: any) {
+
+      if (from) {
+        navigate(from, { replace: true });
+      } else if (user?.role === 'client') {
+        navigate('/client-dashboard', { replace: true });
+      } else if (user?.role === 'talent') {
+        navigate('/talent-dashboard', { replace: true });
+      } else {
+        navigate('/admin', { replace: true });
+      }
+    } catch (error) {
       console.error(error);
+      const errorMessage = error instanceof Error ? error.message : "Invalid email or password.";
       toast({
         variant: "destructive",
         title: "Login failed",
-        description: error.response?.data?.message || "Invalid email or password.",
+        description: errorMessage,
       });
     } finally {
       setIsLoading(false);
@@ -101,7 +121,7 @@ const Login = () => {
             <h2 className="text-3xl font-bold font-heading">Log in to your account</h2>
             <p className="text-muted-foreground mt-2">
               Don't have an account?{" "}
-              <Link to="/register" className="text-primary hover:underline font-medium">
+              <Link to="/register" state={{ from, role }} className="text-primary hover:underline font-medium">
                 Sign up
               </Link>
             </p>
@@ -114,8 +134,8 @@ const Login = () => {
               onClick={() => setRole('client')}
               className={`flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ${
                 role === 'client'
-                  ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'bg-primary/10 text-primary shadow-sm ring-1 ring-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
               }`}
             >
               Client
@@ -126,12 +146,12 @@ const Login = () => {
               onClick={() => setRole('talent')}
               className={`flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ${
                 role === 'talent'
-                  ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'bg-secondary/10 text-secondary shadow-sm ring-1 ring-secondary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
               }`}
             >
               Talent
-              {role === 'talent' && <Check className="w-3 h-3 text-primary" />}
+              {role === 'talent' && <Check className="w-3 h-3 text-secondary" />}
             </button>
           </div>
 
@@ -145,14 +165,14 @@ const Login = () => {
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 required
-                className="input-styled"
+                className={`input-styled ${role === 'client' ? 'focus:ring-primary' : 'focus:ring-secondary'}`}
               />
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
-                <Link to="/forgot-password" className="text-sm text-primary hover:underline">
+                <Link to="/forgot-password" className={`text-sm hover:underline ${role === 'client' ? 'text-primary' : 'text-secondary'}`}>
                   Forgot password?
                 </Link>
               </div>
@@ -163,7 +183,7 @@ const Login = () => {
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 required
-                className="input-styled"
+                className={`input-styled ${role === 'client' ? 'focus:ring-primary' : 'focus:ring-secondary'}`}
               />
             </div>
 
@@ -172,6 +192,7 @@ const Login = () => {
                 id="remember" 
                 checked={rememberMe} 
                 onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                className={role === 'client' ? 'data-[state=checked]:bg-primary' : 'data-[state=checked]:bg-secondary'}
               />
               <label
                 htmlFor="remember"
@@ -181,7 +202,15 @@ const Login = () => {
               </label>
             </div>
 
-            <Button type="submit" className="w-full btn-gradient h-11" disabled={isLoading}>
+            <Button 
+              type="submit" 
+              className={`w-full h-11 transition-colors ${
+                role === 'client' 
+                  ? 'bg-primary hover:bg-primary/90 text-primary-foreground' 
+                  : 'bg-secondary hover:bg-secondary/90 text-secondary-foreground'
+              }`} 
+              disabled={isLoading}
+            >
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

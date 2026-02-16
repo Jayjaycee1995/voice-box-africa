@@ -15,12 +15,12 @@ import {
   Filter,
   Loader2
 } from "lucide-react";
-import api from "@/lib/axios";
+import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useToast } from "@/hooks/use-toast";
 
 interface Conversation {
-  id: number;
+  id: string;
   name: string;
   avatar: string;
   role: string;
@@ -31,11 +31,26 @@ interface Conversation {
 
 interface Message {
   id: number;
-  sender_id: number;
-  receiver_id: number;
+  sender_id: string;
+  receiver_id: string;
   content: string;
   created_at: string;
   is_read: boolean;
+}
+
+interface MessageWithDetails extends Message {
+  sender: {
+    id: string;
+    name: string;
+    profile_image: string | null;
+    role: string;
+  };
+  receiver: {
+    id: string;
+    name: string;
+    profile_image: string | null;
+    role: string;
+  };
 }
 
 const contentFilterRules = [
@@ -67,11 +82,53 @@ const MessagesView = () => {
 
   useEffect(() => {
     let isMounted = true;
+    
+    if (!user) return;
+
     const fetchConversationsAsync = async () => {
       try {
-        const response = await api.get('/conversations');
-        if (isMounted) {
-          setConversations(response.data);
+        const { data, error } = await supabase
+          .from('messages')
+          .select(`
+            *,
+            sender:sender_id(id, name, profile_image, role),
+            receiver:receiver_id(id, name, profile_image, role)
+          `)
+          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (isMounted && data) {
+          const conversationsMap = new Map();
+          
+          (data as unknown as MessageWithDetails[]).forEach((msg) => {
+            const isSender = msg.sender_id === user.id;
+            const otherUser = isSender ? msg.receiver : msg.sender;
+            
+            if (!otherUser) return;
+            
+            const partnerId = otherUser.id;
+            
+            if (!conversationsMap.has(partnerId)) {
+              conversationsMap.set(partnerId, {
+                id: partnerId,
+                name: otherUser.name || 'Unknown User',
+                avatar: otherUser.profile_image || '',
+                role: otherUser.role || 'user',
+                last_message: msg.content,
+                last_message_time: msg.created_at,
+                unread_count: 0
+              });
+            }
+            
+            const conv = conversationsMap.get(partnerId);
+            if (!isSender && !msg.is_read) {
+              conv.unread_count++;
+            }
+          });
+          
+          setConversations(Array.from(conversationsMap.values()));
           setIsLoadingConversations(false);
         }
       } catch (error) {
@@ -87,13 +144,55 @@ const MessagesView = () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, []);
+  }, [user]);
 
   const fetchConversations = async () => {
+    if (!user) return;
     try {
-      const response = await api.get('/conversations');
-      setConversations(response.data);
-      setIsLoadingConversations(false);
+      const { data, error } = await supabase
+        .from('messages')
+        .select(`
+          *,
+          sender:sender_id(id, name, profile_image, role),
+          receiver:receiver_id(id, name, profile_image, role)
+        `)
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        const conversationsMap = new Map();
+        
+        (data as unknown as MessageWithDetails[]).forEach((msg) => {
+          const isSender = msg.sender_id === user.id;
+          const otherUser = isSender ? msg.receiver : msg.sender;
+          
+          if (!otherUser) return;
+          
+          const partnerId = otherUser.id;
+          
+          if (!conversationsMap.has(partnerId)) {
+            conversationsMap.set(partnerId, {
+              id: partnerId,
+              name: otherUser.name || 'Unknown User',
+              avatar: otherUser.profile_image || '',
+              role: otherUser.role || 'user',
+              last_message: msg.content,
+              last_message_time: msg.created_at,
+              unread_count: 0
+            });
+          }
+          
+          const conv = conversationsMap.get(partnerId);
+          if (!isSender && !msg.is_read) {
+            conv.unread_count++;
+          }
+        });
+        
+        setConversations(Array.from(conversationsMap.values()));
+        setIsLoadingConversations(false);
+      }
     } catch (error) {
       console.error("Failed to fetch conversations", error);
     }
@@ -101,12 +200,31 @@ const MessagesView = () => {
 
   useEffect(() => {
     let isMounted = true;
-    if (selectedConversation) {
-      const fetchMessagesAsync = async (userId: number) => {
+    if (selectedConversation && user) {
+      const fetchMessagesAsync = async (partnerId: string) => {
         try {
-          const response = await api.get(`/messages/${userId}`);
-          if (isMounted) {
-            setMessages(response.data);
+          const { data, error } = await supabase
+            .from('messages')
+            .select('*')
+            .or(`and(sender_id.eq.${user.id},receiver_id.eq.${partnerId}),and(sender_id.eq.${partnerId},receiver_id.eq.${user.id})`)
+            .order('created_at', { ascending: true });
+
+          if (error) throw error;
+
+          if (isMounted && data) {
+            setMessages(data as Message[]);
+            
+            // Mark messages from partner as read
+            const unreadIds = (data as Message[])
+              .filter((m) => m.sender_id === partnerId && !m.is_read)
+              .map((m) => m.id);
+              
+            if (unreadIds.length > 0) {
+              await supabase
+                .from('messages')
+                .update({ is_read: true })
+                .in('id', unreadIds);
+            }
           }
         } catch (error) {
           if (isMounted) {
@@ -128,12 +246,34 @@ const MessagesView = () => {
         clearInterval(interval);
       };
     }
-  }, [selectedConversation]);
+  }, [selectedConversation, user]);
 
-  const fetchMessages = async (userId: number) => {
+  const fetchMessages = async (partnerId: string) => {
+    if (!user) return;
     try {
-      const response = await api.get(`/messages/${userId}`);
-      setMessages(response.data);
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${partnerId}),and(sender_id.eq.${partnerId},receiver_id.eq.${user.id})`)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      if (data) {
+        setMessages(data as Message[]);
+        
+        // Mark messages from partner as read
+        const unreadIds = (data as Message[])
+          .filter((m) => m.sender_id === partnerId && !m.is_read)
+          .map((m) => m.id);
+          
+        if (unreadIds.length > 0) {
+          await supabase
+            .from('messages')
+            .update({ is_read: true })
+            .in('id', unreadIds);
+        }
+      }
     } catch (error) {
       console.error("Failed to fetch messages", error);
     }
@@ -176,12 +316,22 @@ const MessagesView = () => {
     }
     
     try {
-      const response = await api.post('/messages', {
-        receiver_id: selectedConversation.id,
-        content: messageInput
-      });
+      if (!user) return;
       
-      setMessages(prev => [...prev, response.data.data]);
+      const { data, error } = await supabase
+        .from('messages')
+        .insert({
+          sender_id: user.id,
+          receiver_id: selectedConversation.id,
+          content: messageInput,
+          is_read: false
+        })
+        .select()
+        .single();
+        
+      if (error) throw error;
+      
+      setMessages(prev => [...prev, data as Message]);
       setMessageInput("");
       fetchConversations();
     } catch (error) {
@@ -318,21 +468,21 @@ const MessagesView = () => {
                   {messages.map((message) => (
                     <div
                       key={message.id}
-                      className={`flex ${Number(message.sender_id) === Number(user?.id) ? 'justify-end' : 'justify-start'}`}
+                      className={`flex ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
                     >
                       <div
                         className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm ${
-                          Number(message.sender_id) === Number(user?.id)
+                          message.sender_id === user?.id
                             ? 'bg-primary text-primary-foreground rounded-br-none'
                             : 'bg-card text-foreground border rounded-bl-none'
                         }`}
                       >
                         <p className="text-sm leading-relaxed">{message.content}</p>
                         <div className={`flex items-center gap-1 mt-1 text-[10px] ${
-                          Number(message.sender_id) === Number(user?.id) ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                          message.sender_id === user?.id ? 'text-primary-foreground/70' : 'text-muted-foreground'
                         }`}>
                           <span>{formatTime(message.created_at)}</span>
-                          {Number(message.sender_id) === Number(user?.id) && (
+                          {message.sender_id === user?.id && (
                             <CheckCircle2 className="w-3 h-3" />
                           )}
                         </div>

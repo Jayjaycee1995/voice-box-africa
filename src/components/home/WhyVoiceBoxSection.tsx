@@ -32,7 +32,7 @@ const WhyVoiceBoxSection = () => {
           <div>
             <p className="text-sm font-medium text-secondary mb-2">Why choose us</p>
             <h2 className="font-heading text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-10">
-              Why businesses turn to <span className="gradient-brand-text">Voibox</span>
+              Why businesses turn to <span className="gradient-brand-text">VoiceBox</span>
             </h2>
 
             <div className="space-y-8">

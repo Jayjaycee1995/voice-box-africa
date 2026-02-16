@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +13,17 @@ import { User, Lock, Bell, CreditCard, LogOut } from "lucide-react";
 const SettingsView = () => {
   const { user, logout } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    setIsLoading(true);
+    try {
+      await logout();
+      navigate("/login", { replace: true });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -98,7 +110,7 @@ const SettingsView = () => {
               </div>
             </CardContent>
             <CardFooter className="justify-between">
-              <Button variant="destructive" onClick={() => logout()}>Log out of all devices</Button>
+              <Button variant="destructive" onClick={handleLogout} disabled={isLoading}>Log out of all devices</Button>
               <Button>Update Password</Button>
             </CardFooter>
           </Card>

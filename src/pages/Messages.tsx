@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/layout/DashboardHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,12 +17,12 @@ import {
   Filter,
   Loader2
 } from "lucide-react";
-import api from "@/lib/axios";
+import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useToast } from "@/hooks/use-toast";
 
 interface Conversation {
-  id: number;
+  id: string;
   name: string;
   avatar: string;
   role: string;
@@ -33,14 +33,12 @@ interface Conversation {
 
 interface Message {
   id: number;
-  sender_id: number;
-  receiver_id: number;
+  sender_id: string;
+  receiver_id: string;
   content: string;
   created_at: string;
   is_read: boolean;
 }
-
-// Content filtering rules (PRD Section 4.7)
 
 // Content filtering rules (PRD Section 4.7)
 const contentFilterRules = [
@@ -51,6 +49,16 @@ const contentFilterRules = [
   { pattern: /\bfree\b.*\btrial\b|\btrial\b.*\bfree\b/i, action: "warn", reason: "Suspicious promotional content" }
 ];
 
+interface MessageWithUsers {
+  sender_id: string;
+  receiver_id: string;
+  content: string;
+  created_at: string;
+  is_read: boolean;
+  sender?: { id: string; name: string; profile_image: string; role: string };
+  receiver?: { id: string; name: string; profile_image: string; role: string };
+}
+
 const Messages = () => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -60,6 +68,7 @@ const Messages = () => {
   const [isLoadingConversations, setIsLoadingConversations] = useState(true);
   const { user, isAuthenticated } = useAuthStore();
   const { toast } = useToast();
+  const location = useLocation();
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -78,7 +87,7 @@ const Messages = () => {
         title: "Authentication required",
         description: "Please log in to view your messages.",
       });
-      navigate("/login");
+      navigate("/login", { state: { from: `${location.pathname}${location.search}` } });
       return;
     }
     fetchConversations(isMounted);
@@ -87,21 +96,66 @@ const Messages = () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [isAuthenticated, navigate, toast]);
+  }, [isAuthenticated, location.pathname, location.search, navigate, toast, fetchConversations]);
 
-  const fetchConversations = async (isMounted: boolean = true) => {
+  const fetchConversations = useCallback(async (isMounted: boolean = true) => {
+    if (!user) return;
     try {
-      const response = await api.get('/conversations');
-      if (isMounted) {
-        setConversations(response.data);
+      const { data, error } = await supabase
+        .from('messages')
+        .select(`
+          *,
+          sender:sender_id(id, name, profile_image, role),
+          receiver:receiver_id(id, name, profile_image, role)
+        `)
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (isMounted && data) {
+        const conversationsMap = new Map();
+        
+        (data as unknown as MessageWithUsers[]).forEach((msg) => {
+          const isSender = msg.sender_id === user.id;
+          const otherUser = isSender ? msg.receiver : msg.sender;
+          
+          if (!otherUser) return;
+          
+          const partnerId = otherUser.id;
+          
+          if (!conversationsMap.has(partnerId)) {
+            conversationsMap.set(partnerId, {
+              id: partnerId,
+              name: otherUser.name || 'Unknown User',
+              avatar: otherUser.profile_image || '',
+              role: otherUser.role || 'user',
+              last_message: msg.content,
+              last_message_time: msg.created_at,
+              unread_count: 0
+            });
+          }
+          
+          const conv = conversationsMap.get(partnerId);
+          if (!isSender && !msg.is_read) {
+            conv.unread_count++;
+          }
+        });
+        
+        setConversations(Array.from(conversationsMap.values()));
         setIsLoadingConversations(false);
       }
     } catch (error) {
       if (isMounted) {
         console.error("Failed to fetch conversations", error);
+        toast({
+          title: "Error",
+          description: "Failed to load conversations.",
+          variant: "destructive",
+        });
       }
     }
-  };
+  }, [user, toast]);
 
   useEffect(() => {
     let isMounted = true;
@@ -112,27 +166,49 @@ const Messages = () => {
       setConversations(prev => prev.map(conv => 
         conv.id === selectedConversation.id ? { ...conv, unread_count: 0 } : conv
       ));
-
-      const interval = setInterval(() => fetchMessages(selectedConversation.id, isMounted), 5000);
-      return () => {
-        isMounted = false;
-        clearInterval(interval);
-      };
     }
-  }, [selectedConversation]);
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedConversation, fetchMessages]);
 
-  const fetchMessages = async (userId: number, isMounted: boolean = true) => {
+  const fetchMessages = useCallback(async (partnerId: string, isMounted: boolean = true) => {
+    if (!user) return;
     try {
-      const response = await api.get(`/messages/${userId}`);
-      if (isMounted) {
-        setMessages(response.data);
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${partnerId}),and(sender_id.eq.${partnerId},receiver_id.eq.${user.id})`)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      if (isMounted && data) {
+        setMessages(data as Message[]);
+        
+        // Mark messages from partner as read
+        const unreadIds = data
+          .filter((m: Message) => m.sender_id === partnerId && !m.is_read)
+          .map((m: Message) => m.id);
+          
+        if (unreadIds.length > 0) {
+          await supabase
+            .from('messages')
+            .update({ is_read: true })
+            .in('id', unreadIds);
+        }
       }
     } catch (error) {
       if (isMounted) {
         console.error("Failed to fetch messages", error);
+        toast({
+          title: "Error",
+          description: "Failed to load messages.",
+          variant: "destructive",
+        });
       }
     }
-  };
+  }, [user, toast]);
 
   const filteredConversations = conversations.filter(conv => 
     conv.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -171,12 +247,22 @@ const Messages = () => {
     }
     
     try {
-      const response = await api.post('/messages', {
-        receiver_id: selectedConversation.id,
-        content: messageInput
-      });
+      if (!user) return;
       
-      setMessages(prev => [...prev, response.data.data]);
+      const { data, error } = await supabase
+        .from('messages')
+        .insert({
+          sender_id: user.id,
+          receiver_id: selectedConversation.id,
+          content: messageInput,
+          is_read: false
+        })
+        .select()
+        .single();
+        
+      if (error) throw error;
+      
+      setMessages(prev => [...prev, data as Message]);
       setMessageInput("");
       fetchConversations();
     } catch (error) {

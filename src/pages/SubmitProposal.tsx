@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useLocation, useParams, Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Upload, Clock, DollarSign, Loader2 } from "lucide-react";
+import { ArrowLeft, Upload, Clock, Loader2 } from "lucide-react";
 import { Gig } from "@/lib/database.types";
-import api from "@/lib/axios";
+import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useToast } from "@/hooks/use-toast";
 
@@ -33,6 +33,7 @@ const SubmitProposal = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const { toast } = useToast();
+  const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuthStore();
 
@@ -57,7 +58,7 @@ const SubmitProposal = () => {
         title: "Authentication required",
         description: "Please log in to submit a proposal.",
       });
-      navigate("/login");
+      navigate("/login", { state: { from: `${location.pathname}${location.search}`, role: "talent" } });
       return;
     }
 
@@ -73,10 +74,18 @@ const SubmitProposal = () => {
 
     const fetchGig = async () => {
       try {
-        const response = await api.get(`/gigs/${gigId}`);
-        setGig(response.data);
-        if (response.data.budget) {
-          setValue("bidPrice", response.data.budget * 0.9);
+        const { data, error } = await supabase
+          .from('gigs')
+          .select('*')
+          .eq('id', gigId)
+          .single();
+
+        if (error) throw error;
+
+        const gigData = data as unknown as Gig;
+        setGig(gigData);
+        if (gigData.budget) {
+          setValue("bidPrice", gigData.budget * 0.9);
         }
       } catch (error) {
         console.error("Failed to fetch gig", error);
@@ -86,7 +95,7 @@ const SubmitProposal = () => {
       }
     };
     if (gigId) fetchGig();
-  }, [gigId, setValue, toast]);
+  }, [gigId, location.pathname, location.search, setValue, toast, isAuthenticated, navigate, user?.role]);
 
   const bidPrice = watch("bidPrice");
   const deliveryTime = watch("deliveryTime");
@@ -115,15 +124,57 @@ const SubmitProposal = () => {
     }
   };
 
+  const uploadDemo = async (file: File) => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Math.random()}.${fileExt}`;
+    const filePath = `${user?.id}/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('demos')
+      .upload(filePath, file);
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data } = supabase.storage
+      .from('demos')
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
+  };
+
   const onSubmit = async (data: ProposalFormValues) => {
     setIsSubmitting(true);
     
-    try {
-      await api.post(`/gigs/${gigId}/proposals`, {
-        bid_amount: data.bidPrice,
-        cover_letter: `${data.proposalText}\n\nDelivery Time: ${data.deliveryTime} days`,
-        // demo_url would be uploaded separately, skipping for now
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to submit a proposal.",
+        variant: "destructive",
       });
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      let demoUrl = null;
+      if (selectedFile) {
+        demoUrl = await uploadDemo(selectedFile);
+      }
+
+      const { error } = await supabase
+        .from('proposals')
+        .insert({
+          gig_id: Number(gigId),
+          talent_id: user.id,
+          bid_amount: data.bidPrice,
+          cover_letter: `${data.proposalText}\n\nDelivery Time: ${data.deliveryTime} days`,
+          status: 'pending',
+          demo_url: demoUrl
+        });
+
+      if (error) throw error;
       
       toast({
         title: "Success",
@@ -132,11 +183,12 @@ const SubmitProposal = () => {
       
       navigate('/browse-gigs');
       
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error submitting proposal:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to submit proposal. Please try again.';
       toast({
         title: "Error",
-        description: error.response?.data?.message || 'Failed to submit proposal. Please try again.',
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

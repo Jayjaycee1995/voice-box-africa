@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserPlus, X, Send, Loader2 } from "lucide-react";
 import { Gig } from "@/lib/database.types";
-import api from "@/lib/axios";
+import { supabase } from "@/lib/supabase";
+import { useAuthStore } from "@/store/useAuthStore";
 import { useToast } from "@/hooks/use-toast";
 
 interface InviteModalProps {
@@ -17,8 +18,6 @@ interface InviteModalProps {
   artistName: string;
 }
 
-// Mock gigs data removed
-
 const InviteModal = ({ isOpen, onClose, artistId, artistName }: InviteModalProps) => {
   const [selectedGigId, setSelectedGigId] = useState("");
   const [invitationMessage, setInvitationMessage] = useState("");
@@ -26,26 +25,34 @@ const InviteModal = ({ isOpen, onClose, artistId, artistName }: InviteModalProps
   const [gigs, setGigs] = useState<Gig[]>([]);
   const [isLoadingGigs, setIsLoadingGigs] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuthStore();
 
   const selectedGig = gigs.find(gig => gig.id.toString() === selectedGigId);
 
   useEffect(() => {
+    const fetchMyGigs = async () => {
+      if (!user) return;
+      setIsLoadingGigs(true);
+      try {
+        const { data, error } = await supabase
+          .from('gigs')
+          .select('*')
+          .eq('client_id', user.id)
+          .eq('status', 'open');
+
+        if (error) throw error;
+        setGigs(data as unknown as Gig[]);
+      } catch (error) {
+        console.error("Failed to fetch gigs", error);
+      } finally {
+        setIsLoadingGigs(false);
+      }
+    };
+
     if (isOpen) {
       fetchMyGigs();
     }
-  }, [isOpen]);
-
-  const fetchMyGigs = async () => {
-    setIsLoadingGigs(true);
-    try {
-      const response = await api.get('/my-gigs');
-      setGigs(response.data);
-    } catch (error) {
-      console.error("Failed to fetch gigs", error);
-    } finally {
-      setIsLoadingGigs(false);
-    }
-  };
+  }, [isOpen, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,14 +62,25 @@ const InviteModal = ({ isOpen, onClose, artistId, artistName }: InviteModalProps
       return;
     }
 
+    if (!user) {
+      toast({ title: "Error", description: "You must be logged in to send invitations", variant: "destructive" });
+      return;
+    }
+
     setIsSubmitting(true);
     
     try {
-      await api.post('/invitations', {
-        talent_id: artistId,
-        gig_id: selectedGigId,
-        message: invitationMessage
-      });
+      const { error } = await supabase
+        .from('invitations')
+        .insert({
+          client_id: user.id,
+          talent_id: artistId,
+          gig_id: Number(selectedGigId),
+          message: invitationMessage,
+          status: 'pending'
+        });
+      
+      if (error) throw error;
       
       toast({ title: "Success", description: `Invitation sent to ${artistName} successfully!` });
       onClose();
@@ -72,7 +90,8 @@ const InviteModal = ({ isOpen, onClose, artistId, artistName }: InviteModalProps
       
     } catch (error) {
       console.error('Error sending invitation:', error);
-      toast({ title: "Error", description: "Failed to send invitation.", variant: "destructive" });
+      const errorMessage = error instanceof Error ? error.message : "Failed to send invitation.";
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }

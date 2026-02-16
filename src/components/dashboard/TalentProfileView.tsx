@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Upload, Play, Trash2, Plus, Loader2, Save, Copy, Check } from "lucide-react";
-import api from "@/lib/axios";
+import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 
 interface Demo {
@@ -36,24 +36,32 @@ const TalentProfileView = () => {
 
   useEffect(() => {
     let isMounted = true;
-    const fetchDemosAsync = async () => {
-      try {
-        const response = await api.get('/demos');
-        if (isMounted) {
-          setDemos(response.data);
+    if (user) {
+      const fetchDemosAsync = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('demos')
+            .select('*')
+            .eq('user_id', user.id);
+            
+          if (error) throw error;
+          
+          if (isMounted) {
+            setDemos(data as unknown as Demo[]);
+          }
+        } catch (error) {
+          if (isMounted) {
+            console.error("Failed to fetch demos", error);
+          }
         }
-      } catch (error) {
-        if (isMounted) {
-          console.error("Failed to fetch demos", error);
-        }
-      }
-    };
+      };
 
-    fetchDemosAsync();
+      fetchDemosAsync();
+    }
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (user) {
@@ -93,9 +101,15 @@ const TalentProfileView = () => {
   };
 
   const fetchDemos = async () => {
+    if (!user) return;
     try {
-      const response = await api.get('/demos');
-      setDemos(response.data);
+      const { data, error } = await supabase
+        .from('demos')
+        .select('*')
+        .eq('user_id', user.id);
+        
+      if (error) throw error;
+      setDemos(data as unknown as Demo[]);
     } catch (error) {
       console.error("Failed to fetch demos", error);
     }
@@ -103,51 +117,88 @@ const TalentProfileView = () => {
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('title', file.name.replace(/\.[^/.]+$/, ""));
-    formData.append('type', 'Demo');
+    if (!file || !user) return;
 
     setIsUploading(true);
     try {
-      await api.post('/demos', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Math.random()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('demos')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage
+        .from('demos')
+        .getPublicUrl(fileName);
+
+      const { error: dbError } = await supabase
+        .from('demos')
+        .insert({
+          user_id: user.id,
+          title: file.name.replace(/\.[^/.]+$/, ""),
+          file_path: publicUrlData.publicUrl,
+          type: 'Demo',
+          duration: '0:00'
+        });
+
+      if (dbError) throw dbError;
+
       toast({ title: "Success", description: "Demo uploaded successfully" });
       fetchDemos();
     } catch (error) {
+      console.error(error);
       toast({ title: "Error", description: "Failed to upload demo", variant: "destructive" });
     } finally {
       setIsUploading(false);
-      // Reset input
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('profile_image', file);
-    formData.append('name', name); 
+    if (!file || !user) return;
 
     try {
-      const response = await api.post('/user/profile', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      setUser(response.data.user);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/avatar-${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('profile-images')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage
+        .from('profile-images')
+        .getPublicUrl(fileName);
+
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ profile_image: publicUrlData.publicUrl })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      setUser({ ...user, profile_image: publicUrlData.publicUrl });
       toast({ title: "Success", description: "Profile image updated" });
     } catch (error) {
+      console.error(error);
       toast({ title: "Error", description: "Failed to upload profile image", variant: "destructive" });
     }
   };
 
   const handleDeleteDemo = async (id: number) => {
     try {
-      await api.delete(`/demos/${id}`);
+      const { error } = await supabase
+        .from('demos')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
       toast({ title: "Success", description: "Demo deleted" });
       setDemos(demos.filter(d => d.id !== id));
     } catch (error) {
@@ -158,14 +209,26 @@ const TalentProfileView = () => {
   const handleSaveProfile = async () => {
      setIsSaving(true);
      try {
-       const response = await api.post('/user/profile', {
+       if (!user) return;
+       
+       const updates = {
          name,
          bio,
-         skills: JSON.stringify(skills)
-       });
-       setUser(response.data.user);
+         skills: JSON.stringify(skills),
+         updated_at: new Date().toISOString()
+       };
+
+       const { error } = await supabase
+         .from('users')
+         .update(updates)
+         .eq('id', user.id);
+
+       if (error) throw error;
+       
+       setUser({ ...user, ...updates });
        toast({ title: "Profile Saved", description: "Your changes have been saved." });
      } catch (error) {
+       console.error(error);
        toast({ title: "Error", description: "Failed to save profile", variant: "destructive" });
      } finally {
        setIsSaving(false);

@@ -1,26 +1,135 @@
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Download, ExternalLink } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useAuthStore } from "@/store/useAuthStore";
 
-const transactions = [
-  { id: "INV-001", date: "2024-12-01", description: "Payment for MTN Commercial", amount: "$150.00", status: "Paid" },
-  { id: "INV-002", date: "2024-11-20", description: "Escrow Deposit: E-learning Series", amount: "$300.00", status: "Escrow" },
-  { id: "INV-003", date: "2024-11-15", description: "Refund: Cancelled Gig", amount: "-$50.00", status: "Refunded" },
-];
+type PaymentRow = {
+  id: string;
+  date: string;
+  description: string;
+  amount: string;
+  status: string;
+};
 
 const PaymentsView = ({ role }: { role: 'client' | 'talent' }) => {
+  const { user } = useAuthStore();
+  const [rows, setRows] = useState<PaymentRow[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [totals, setTotals] = useState({ total: 0, pending: 0, available: 0 });
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchAsync = async () => {
+      if (!user) return;
+      setIsLoading(true);
+
+      try {
+        if (role === "client") {
+          const { data, error } = await supabase
+            .from("gigs")
+            .select("id, title, budget, status, created_at")
+            .eq("client_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(50);
+
+          if (error) throw error;
+
+          const gigs = (data ?? []) as Array<{
+            id: number;
+            title: string;
+            budget: number;
+            status: "open" | "assigned" | "completed" | "cancelled";
+            created_at: string;
+          }>;
+
+          const totalSpent = gigs
+            .filter((g) => g.status === "completed")
+            .reduce((acc, g) => acc + (g.budget || 0), 0);
+          const pending = gigs
+            .filter((g) => g.status === "assigned")
+            .reduce((acc, g) => acc + (g.budget || 0), 0);
+
+          const mapped: PaymentRow[] = gigs.map((g) => ({
+            id: `GIG-${g.id}`,
+            date: new Date(g.created_at).toLocaleDateString(),
+            description: g.title,
+            amount: `$${(g.budget || 0).toFixed(2)}`,
+            status: g.status,
+          }));
+
+          if (!isMounted) return;
+          setRows(mapped);
+          setTotals({ total: totalSpent, pending, available: 0 });
+        } else {
+          const { data, error } = await supabase
+            .from("proposals")
+            .select("id, bid_amount, status, created_at, gig:gigs(title)")
+            .eq("talent_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(50);
+
+          if (error) throw error;
+
+          const proposals = (data ?? []) as Array<{
+            id: number;
+            bid_amount: number;
+            status: "pending" | "accepted" | "rejected";
+            created_at: string;
+            gig?: { title: string } | null;
+          }>;
+
+          const totalEarned = proposals
+            .filter((p) => p.status === "accepted")
+            .reduce((acc, p) => acc + (p.bid_amount || 0), 0);
+          const pending = proposals
+            .filter((p) => p.status === "pending")
+            .reduce((acc, p) => acc + (p.bid_amount || 0), 0);
+
+          const mapped: PaymentRow[] = proposals.map((p) => ({
+            id: `PROP-${p.id}`,
+            date: new Date(p.created_at).toLocaleDateString(),
+            description: p.gig?.title || "Proposal",
+            amount: `$${(p.bid_amount || 0).toFixed(2)}`,
+            status: p.status,
+          }));
+
+          if (!isMounted) return;
+          setRows(mapped);
+          setTotals({ total: totalEarned, pending, available: totalEarned });
+        }
+      } catch (e) {
+        if (!isMounted) return;
+        setRows([]);
+        setTotals({ total: 0, pending: 0, available: 0 });
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    fetchAsync();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [role, user]);
+
+  const header = useMemo(() => {
+    if (role === "client") return { title: "Payments & Invoices", subtitle: "Track your project spending." };
+    return { title: "Earnings", subtitle: "Track your proposal outcomes." };
+  }, [role]);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold font-heading">{role === 'client' ? 'Payments & Invoices' : 'Earnings & Withdrawals'}</h2>
-          <p className="text-muted-foreground">Track your financial history.</p>
+          <h2 className="text-2xl font-bold font-heading">{header.title}</h2>
+          <p className="text-muted-foreground">{header.subtitle}</p>
         </div>
-        {role === 'talent' && (
-          <Button className="btn-gradient">Request Withdrawal</Button>
-        )}
       </div>
 
       {/* Summary Cards */}
@@ -28,19 +137,19 @@ const PaymentsView = ({ role }: { role: 'client' | 'talent' }) => {
         <Card>
            <CardContent className="p-6">
              <p className="text-sm font-medium text-muted-foreground">Total {role === 'client' ? 'Spent' : 'Earned'}</p>
-             <h3 className="text-2xl font-bold mt-2">$2,450.00</h3>
+             <h3 className="text-2xl font-bold mt-2">${totals.total.toFixed(2)}</h3>
            </CardContent>
         </Card>
         <Card>
            <CardContent className="p-6">
-             <p className="text-sm font-medium text-muted-foreground">Pending / Escrow</p>
-             <h3 className="text-2xl font-bold mt-2">$300.00</h3>
+             <p className="text-sm font-medium text-muted-foreground">Pending</p>
+             <h3 className="text-2xl font-bold mt-2">${totals.pending.toFixed(2)}</h3>
            </CardContent>
         </Card>
         <Card>
            <CardContent className="p-6">
              <p className="text-sm font-medium text-muted-foreground">Available Balance</p>
-             <h3 className="text-2xl font-bold mt-2">$150.00</h3>
+             <h3 className="text-2xl font-bold mt-2">${totals.available.toFixed(2)}</h3>
            </CardContent>
         </Card>
       </div>
@@ -50,39 +159,41 @@ const PaymentsView = ({ role }: { role: 'client' | 'talent' }) => {
           <CardTitle>Transaction History</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {transactions.map((tx) => (
-                <TableRow key={tx.id}>
-                  <TableCell>{tx.date}</TableCell>
-                  <TableCell>
-                    <div className="font-medium">{tx.description}</div>
-                    <div className="text-xs text-muted-foreground">{tx.id}</div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={tx.status === 'Paid' ? 'default' : 'secondary'}>{tx.status}</Badge>
-                  </TableCell>
-                  <TableCell className={`text-right font-medium ${tx.amount.startsWith('-') ? 'text-destructive' : ''}`}>
-                    {tx.amount}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon">
-                      <Download className="w-4 h-4" />
-                    </Button>
-                  </TableCell>
+          {isLoading ? (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : rows.length === 0 ? (
+            <div className="py-10 text-center text-muted-foreground">No transactions yet.</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {rows.map((tx) => (
+                  <TableRow key={tx.id}>
+                    <TableCell>{tx.date}</TableCell>
+                    <TableCell>
+                      <div className="font-medium">{tx.description}</div>
+                      <div className="text-xs text-muted-foreground">{tx.id}</div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={tx.status === 'accepted' || tx.status === 'completed' ? 'default' : 'secondary'} className="capitalize">
+                        {tx.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-medium">{tx.amount}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

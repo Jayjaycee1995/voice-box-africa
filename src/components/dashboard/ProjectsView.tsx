@@ -13,23 +13,18 @@ import {
   CheckCircle2,
   Loader2
 } from "lucide-react";
-import api from "@/lib/axios";
+import { supabase } from "@/lib/supabase";
+import { useAuthStore } from "@/store/useAuthStore";
 import { Gig } from "@/lib/database.types";
 
 interface Proposal {
-  id: string;
-  gig_id: string;
-  voice_talent_id: string;
-  bid_price: number;
-  delivery_time: number;
-  proposal_text: string;
-  demo_url?: string;
-  status: 'submitted' | 'shortlisted' | 'rejected' | 'hired';
+  id: number;
+  gig_id: number;
+  talent_id: string;
+  bid_amount: number;
+  status: 'pending' | 'accepted' | 'rejected';
   created_at: string;
-  gig: Gig;
-  client?: {
-    name: string;
-  };
+  gig?: Gig;
 }
 
 interface TalentGig extends Gig {
@@ -44,44 +39,62 @@ const ProjectsView = ({ role }: { role: 'client' | 'talent' }) => {
   const [search, setSearch] = useState("");
   const [projects, setProjects] = useState<TalentGig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuthStore();
 
   useEffect(() => {
     let isMounted = true;
     const fetchProjects = async () => {
+      if (!user) return;
+
       try {
         if (role === 'client') {
-          const response = await api.get('/my-gigs');
-          if (isMounted) setProjects(response.data);
+          const { data, error } = await supabase
+            .from('gigs')
+            .select('*')
+            .eq('client_id', user.id)
+            .order('created_at', { ascending: false });
+            
+          if (error) throw error;
+          if (isMounted) setProjects(data as unknown as TalentGig[]);
         } else {
           // For talents, fetch gigs they've submitted proposals for
-          const response = await api.get('/my-proposals');
+          // Note: Assuming 'proposals' table exists and has a relation to 'gigs'
+          const { data, error } = await supabase
+            .from('proposals')
+            .select('*, gig:gigs(*)')
+            .eq('talent_id', user.id)
+            .order('created_at', { ascending: false });
+
+          if (error) throw error;
+
           if (!isMounted) return;
-          const proposals: Proposal[] = response.data;
+          
+          const proposals = data as unknown as Proposal[];
           // Map proposals to gig format for the view
           const mappedGigs: TalentGig[] = proposals.map((p) => {
             // Safety check for deleted gigs
             if (!p.gig) {
+              const nowIso = new Date().toISOString();
               return {
                 id: p.gig_id,
                 title: 'Unknown Project',
                 description: 'This project may have been deleted',
-                budget: p.bid_price,
-                deadline: new Date().toISOString(),
-                status: 'closed',
+                budget: p.bid_amount,
+                deadline: nowIso,
+                status: 'cancelled',
+                visibility: 'public',
                 created_at: p.created_at,
+                updated_at: p.created_at,
                 client_id: '',
-                category: 'Unknown',
                 proposal_status: p.status,
-                bid_amount: p.bid_price,
-                client: p.client
+                bid_amount: p.bid_amount
               } as TalentGig;
             }
             
             return {
               ...p.gig,
               proposal_status: p.status,
-              bid_amount: p.bid_price,
-              client: p.client
+              bid_amount: p.bid_amount
             };
           });
           setProjects(mappedGigs);
@@ -97,13 +110,16 @@ const ProjectsView = ({ role }: { role: 'client' | 'talent' }) => {
     return () => {
       isMounted = false;
     };
-  }, [role]);
+  }, [role, user]);
 
   const statusColors: Record<string, string> = {
-    "in-progress": "bg-blue-100 text-blue-700",
-    "review": "bg-yellow-100 text-yellow-700",
-    "open": "bg-gray-100 text-gray-700",
-    "completed": "bg-green-100 text-green-700",
+    open: "bg-blue-100 text-blue-700",
+    assigned: "bg-yellow-100 text-yellow-700",
+    completed: "bg-green-100 text-green-700",
+    cancelled: "bg-red-100 text-red-700",
+    pending: "bg-yellow-100 text-yellow-700",
+    accepted: "bg-green-100 text-green-700",
+    rejected: "bg-red-100 text-red-700",
   };
 
   return (

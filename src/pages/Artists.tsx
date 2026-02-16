@@ -6,7 +6,7 @@ import ArtistCard from "@/components/artists/ArtistCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, SlidersHorizontal, X, Loader2 } from "lucide-react";
-import api from "@/lib/axios";
+import { supabase } from "@/lib/supabase";
 
 interface Artist {
   id: string | number;
@@ -45,6 +45,18 @@ const languages = [
   "Igbo",
 ];
 
+interface SupabaseTalent {
+  id: string;
+  name: string;
+  profile_image: string | null;
+  skills: string | null;
+  bio: string | null;
+  is_available: boolean | null;
+  demos: {
+    file_path: string;
+  }[];
+}
+
 const Artists = () => {
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
@@ -59,36 +71,50 @@ const Artists = () => {
     let isMounted = true;
     const fetchArtists = async () => {
       try {
-        const response = await api.get('/talents');
+        const { data, error } = await supabase
+          .from('users')
+          .select('*, demos(*)')
+          .eq('role', 'talent');
+
+        if (error) throw error;
+        
         if (!isMounted) return;
-        const talentData = response.data.map((talent: any) => ({
-          id: talent.id,
-          name: talent.name,
-          avatar: talent.profile_image || `https://ui-avatars.com/api/?name=${encodeURIComponent(talent.name)}&background=random`,
-          location: talent.location || "Africa",
-          languages: (() => {
-            if (!talent.skills) return [];
-            if (Array.isArray(talent.skills)) return talent.skills;
+
+        const talentData = (data as unknown as SupabaseTalent[]).map((talent) => {
+          let languages: string[] = [];
+          
+          if (talent.skills) {
             if (typeof talent.skills === 'string') {
               try {
-                if (talent.skills.trim().startsWith('[') || talent.skills.trim().startsWith('{')) {
-                  const parsed = JSON.parse(talent.skills);
-                  return Array.isArray(parsed) ? parsed : [parsed];
+                // Try parsing as JSON array
+                const parsed = JSON.parse(talent.skills);
+                if (Array.isArray(parsed)) {
+                  languages = parsed;
+                } else {
+                  // If parsing fails or not array, split by comma
+                  languages = talent.skills.split(',').map((s: string) => s.trim()).filter(Boolean);
                 }
-                return talent.skills.split(',').map((s: string) => s.trim()).filter(Boolean);
               } catch (e) {
-                return talent.skills.split(',').map((s: string) => s.trim()).filter(Boolean);
+                // If parsing fails, split by comma
+                languages = talent.skills.split(',').map((s: string) => s.trim()).filter(Boolean);
               }
             }
-            return [];
-          })(),
-          pricePerWord: talent.rate_per_word || 0.15,
-          rating: parseFloat(talent.rating) || 5.0,
-          reviewCount: talent.review_count || 0,
-          isAvailable: talent.is_available === 1 || talent.is_available === true,
-          specialties: talent.specialties ? (typeof talent.specialties === 'string' ? talent.specialties.split(',') : talent.specialties) : (talent.bio ? [talent.bio.substring(0, 20)] : []),
-          demoUrl: talent.demos && talent.demos.length > 0 ? talent.demos[0].file_path : (talent.profile_audio || ""),
-        }));
+          }
+
+          return {
+            id: talent.id,
+            name: talent.name,
+            avatar: talent.profile_image || `https://ui-avatars.com/api/?name=${encodeURIComponent(talent.name)}&background=random`,
+            location: "Africa", // Default location as it's not in the schema yet
+            languages,
+            pricePerWord: 0.15, // Default price
+            rating: 5.0, // Default rating
+            reviewCount: 0, // Default review count
+            isAvailable: talent.is_available ?? true,
+            specialties: talent.bio ? [talent.bio.substring(0, 20) + '...'] : [],
+            demoUrl: talent.demos && talent.demos.length > 0 ? talent.demos[0].file_path : "",
+          };
+        });
         setArtists(talentData);
       } catch (error) {
         if (isMounted) {

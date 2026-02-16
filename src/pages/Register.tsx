@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +21,6 @@ import {
   ChevronLeft,
   X
 } from "lucide-react";
-import api from "@/lib/axios";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useToast } from "@/hooks/use-toast";
 import voiboxLogo from "@/assets/voibox-logo.png";
@@ -37,9 +36,10 @@ const specialties = [
 
 const Register = () => {
   const [userType, setUserType] = useState<UserType>("client");
-  const { login } = useAuthStore();
+  const { register } = useAuthStore();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const [step, setStep] = useState(1);
   const [customLanguage, setCustomLanguage] = useState("");
@@ -81,59 +81,39 @@ const Register = () => {
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
-      const payload = {
-        name: userType === 'talent' ? formData.displayName : formData.fullName,
-        email: formData.email,
-        password: formData.password,
-        password_confirmation: formData.confirmPassword,
-        role: userType,
+      const name = userType === 'talent' ? formData.displayName : formData.fullName;
+      const role = userType;
+      
+      const metadata = {
         bio: userType === 'talent' ? formData.bio : (formData.companyName ? `Company: ${formData.companyName}` : null),
         skills: userType === 'talent' ? JSON.stringify([...formData.languages, ...formData.specialties]) : null,
+        company_name: formData.companyName,
+        industry: formData.industry,
+        location: formData.location,
+        price_per_word: formData.pricePerWord,
+        equipment: formData.equipment,
       };
 
-      const response = await api.post('/register', payload);
-      const { user, access_token } = response.data;
-      
-      login(user, access_token);
+      await register(formData.email, formData.password, name, role, metadata);
       
       toast({
-        title: "Welcome!",
-        description: "Account created successfully.",
+        title: "Registration successful!",
+        description: "Please check your email to confirm your account.",
       });
 
-      if (user.role === 'client') {
-        navigate('/client-dashboard');
-      } else {
-        navigate('/talent-dashboard');
-      }
+      const from = typeof (location.state as { from?: unknown } | null)?.from === "string"
+        ? (location.state as { from?: string }).from
+        : null;
 
-    } catch (error: any) {
+      navigate("/login", { state: { from, role: userType } });
+      
+    } catch (error) {
       console.error(error);
-      let errorMessage = "Registration failed. Please try again.";
-      
-      if (error.response?.data) {
-        if (error.response.data.message) {
-           errorMessage = error.response.data.message;
-        } else if (typeof error.response.data === 'object') {
-           // Extract first validation error
-           const values = Object.values(error.response.data);
-           if (values.length > 0) {
-             const firstError = values[0];
-             if (Array.isArray(firstError)) {
-               errorMessage = firstError[0] as string;
-             } else if (typeof firstError === 'string') {
-               errorMessage = firstError;
-             }
-           }
-        }
-      } else if (error.message) {
-        errorMessage = error.message; // e.g. Network Error
-      }
-      
+      const errorMessage = error instanceof Error ? error.message : "Something went wrong.";
       toast({
-        title: "Registration Failed",
-        description: errorMessage,
         variant: "destructive",
+        title: "Registration failed",
+        description: errorMessage,
       });
     } finally {
       setIsLoading(false);
@@ -189,7 +169,7 @@ const Register = () => {
              <Link to="/"><ChevronLeft className="w-4 h-4" /> Back to Home</Link>
            </Button>
            <p className="text-sm text-muted-foreground">
-             Already have an account? <Link to="/login" className="text-primary font-medium hover:underline">Sign in</Link>
+             Already have an account? <Link to="/login" state={{ from: (location.state as { from?: unknown } | null)?.from ?? null, role: userType }} className="text-primary font-medium hover:underline">Sign in</Link>
            </p>
         </div>
 
@@ -205,7 +185,9 @@ const Register = () => {
               <button
                 onClick={() => { setUserType("client"); setStep(1); }}
                 className={`flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  userType === "client" ? "bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"
+                  userType === "client" 
+                    ? "bg-primary/10 text-primary shadow-sm ring-1 ring-primary" 
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 }`}
               >
                 <Briefcase className="w-4 h-4" />
@@ -214,7 +196,9 @@ const Register = () => {
               <button
                 onClick={() => { setUserType("talent"); setStep(1); }}
                 className={`flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  userType === "talent" ? "bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"
+                  userType === "talent" 
+                    ? "bg-secondary/10 text-secondary shadow-sm ring-1 ring-secondary" 
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 }`}
               >
                 <Mic2 className="w-4 h-4" />
@@ -257,7 +241,7 @@ const Register = () => {
                   </label>
                 </div>
 
-                <Button className="w-full btn-gradient mt-2" size="lg" onClick={handleSubmit} disabled={isLoading || !formData.agreeToTerms}>
+                <Button className="w-full bg-primary hover:bg-primary/90 mt-2" size="lg" onClick={handleSubmit} disabled={isLoading || !formData.agreeToTerms}>
                   {isLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                   Create Account
                 </Button>
@@ -294,7 +278,7 @@ const Register = () => {
                         <Input type="password" value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} />
                       </div>
                     </div>
-                    <Button className="w-full mt-4" onClick={() => setStep(2)}>Continue</Button>
+                    <Button className="w-full mt-4 bg-secondary hover:bg-secondary/90 text-secondary-foreground" onClick={() => setStep(2)}>Continue</Button>
                   </div>
                 )}
 
@@ -355,7 +339,7 @@ const Register = () => {
                     </div>
                     <div className="flex gap-3 pt-2">
                       <Button variant="outline" className="flex-1" onClick={() => setStep(1)}>Back</Button>
-                      <Button className="flex-1" onClick={() => setStep(3)}>Continue</Button>
+                      <Button className="flex-1 bg-secondary hover:bg-secondary/90 text-secondary-foreground" onClick={() => setStep(3)}>Continue</Button>
                     </div>
                   </div>
                 )}
@@ -369,7 +353,7 @@ const Register = () => {
                           <span 
                             key={spec} 
                             onClick={() => handleSpecialtyToggle(spec)}
-                            className={`text-xs px-2 py-1 rounded-full cursor-pointer transition-colors ${formData.specialties.includes(spec) ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"}`}
+                            className={`text-xs px-2 py-1 rounded-full cursor-pointer transition-colors ${formData.specialties.includes(spec) ? "bg-secondary text-secondary-foreground" : "bg-muted hover:bg-muted/80"}`}
                           >
                             {spec}
                           </span>
@@ -386,7 +370,7 @@ const Register = () => {
                     </div>
                     <div className="flex gap-3 pt-2">
                       <Button variant="outline" className="flex-1" onClick={() => setStep(2)}>Back</Button>
-                      <Button className="flex-1 btn-gradient" onClick={handleSubmit} disabled={isLoading || !formData.agreeToTerms}>
+                      <Button className="flex-1 bg-secondary hover:bg-secondary/90 text-secondary-foreground" onClick={handleSubmit} disabled={isLoading || !formData.agreeToTerms}>
                         {isLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                         Complete
                       </Button>

@@ -1,19 +1,98 @@
-// Database Types based on PRD requirements
+
+export type UserRole = 'client' | 'talent' | 'admin';
+export type GigStatus = 'open' | 'assigned' | 'completed' | 'cancelled';
+export type ProposalStatus = 'pending' | 'accepted' | 'rejected';
+export type InvitationStatus = 'pending' | 'accepted' | 'declined';
+export type GigVisibility = 'public' | 'invite-only';
 
 export interface User {
   id: string;
-  role: 'client' | 'talent' | 'admin';
-  name: string;
   email: string;
-  avatar_url?: string;
-  profile_image?: string;
+  name: string;
+  role: UserRole;
   bio?: string;
-  skills?: string;
-  location?: string;
+  skills?: string; // JSON string or comma-separated
+  portfolio_url?: string;
+  profile_image?: string;
   is_available?: boolean;
   created_at: string;
+  updated_at: string;
 }
 
+export interface Gig {
+  id: number;
+  client_id: string;
+  title: string;
+  description: string;
+  budget: number;
+  deadline: string;
+  category?: string;
+  accent?: string;
+  duration?: string;
+  word_count?: number;
+  status: GigStatus;
+  language?: string;
+  tone?: string;
+  visibility: GigVisibility;
+  delivery_file?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Proposal {
+  id: number;
+  gig_id: number;
+  talent_id: string;
+  cover_letter: string;
+  bid_amount: number;
+  status: ProposalStatus;
+  created_at: string;
+  updated_at: string;
+  // Relations
+  gig?: Gig;
+  talent?: User;
+}
+
+export interface Message {
+  id: number;
+  sender_id: string;
+  receiver_id: string;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+  updated_at: string;
+  // Relations
+  sender?: User;
+  receiver?: User;
+}
+
+export interface Invitation {
+  id: number;
+  client_id: string;
+  talent_id: string;
+  gig_id: number;
+  message?: string;
+  status: InvitationStatus;
+  created_at: string;
+  updated_at: string;
+  // Relations
+  gig?: Gig;
+  client?: User;
+  talent?: User;
+}
+
+export interface Demo {
+  id: number;
+  user_id: string;
+  title: string;
+  file_path: string;
+  duration?: string;
+  type?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Keeping these for compatibility if needed, but they are not in SUPABASE_SCHEMA.sql
 export interface VoiceTalentProfile {
   user_id: string;
   bio?: string;
@@ -26,49 +105,13 @@ export interface VoiceTalentProfile {
   rating_avg?: number;
 }
 
-export interface Demo {
+export interface Review {
   id: string;
-  voice_talent_id: string;
-  title: string;
-  audio_url: string;
-  category: string;
-  duration: number;
-  bitrate: number;
-}
-
-export interface Gig {
-  id: string;
+  contract_id: string;
   client_id: string;
-  title: string;
-  description: string;
-  script_text?: string;
-  budget?: number;
-  language: string;
-  accent: string;
-  tone: string;
-  deadline: string;
-  visibility: 'public' | 'invite-only';
-  status: 'open' | 'in-progress' | 'completed' | 'cancelled';
-  created_at: string;
-}
-
-export interface Invitation {
-  id: string;
-  gig_id: string;
   voice_talent_id: string;
-  status: 'pending' | 'accepted' | 'declined';
-  created_at: string;
-}
-
-export interface Proposal {
-  id: string;
-  gig_id: string;
-  voice_talent_id: string;
-  bid_price: number;
-  delivery_time: number; // hours
-  proposal_text: string;
-  demo_url?: string;
-  status: 'submitted' | 'shortlisted' | 'rejected' | 'hired';
+  rating: number;
+  comment: string;
   created_at: string;
 }
 
@@ -83,15 +126,6 @@ export interface Contract {
   created_at: string;
 }
 
-export interface Message {
-  id: string;
-  contract_id: string;
-  sender_id: string;
-  message: string;
-  file_url?: string;
-  created_at: string;
-}
-
 export interface Payment {
   id: string;
   contract_id: string;
@@ -99,15 +133,5 @@ export interface Payment {
   amount: number;
   escrow_status: 'pending' | 'held' | 'released' | 'refunded';
   payout_status: 'pending' | 'processing' | 'completed' | 'failed';
-  created_at: string;
-}
-
-export interface Review {
-  id: string;
-  contract_id: string;
-  client_id: string;
-  voice_talent_id: string;
-  rating: number;
-  comment: string;
   created_at: string;
 }

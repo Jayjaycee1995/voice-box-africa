@@ -1,64 +1,64 @@
-import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { LogOut, Bell, MessageSquare, ChevronDown, LayoutDashboard, User, Settings } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@/store/useAuthStore';
+import { Bell, LogOut, Menu, User, X, Mail, MessageSquare, ChevronDown, LayoutDashboard, Settings } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger,
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuLabel
-} from "@/components/ui/dropdown-menu";
-import { useAuthStore } from "@/store/useAuthStore";
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useState, useEffect, useRef } from 'react';
+import { supabase } from '@/lib/supabase';
 import voiboxLogo from "@/assets/voibox-logo.png";
-import { ModeToggle } from "@/components/mode-toggle";
 import { cn } from "@/lib/utils";
-import api from "@/lib/axios";
 
 interface Notification {
   id: string;
   title: string;
   description: string;
   time: string;
-  type: 'proposal' | 'message' | 'system';
+  type: 'proposal' | 'invitation' | 'message' | 'system';
   link: string;
 }
 
 interface Proposal {
   id: string;
+  created_at: string;
   talent?: {
     name: string;
   };
-  created_at: string;
 }
 
-interface Gig {
+interface GigWithProposals {
   id: string;
   title: string;
-  proposals?: Proposal[];
+  proposals: Proposal[];
 }
 
-interface Invitation {
+interface InvitationWithDetails {
   id: string;
+  created_at: string;
   status: string;
-  client?: {
-    name: string;
-  };
   gig?: {
     title: string;
   };
-  created_at: string;
-}
-
-interface Conversation {
-  id: string;
-  unread_count: number;
-  other_user?: {
+  client?: {
     name: string;
   };
-  updated_at: string;
+}
+
+interface MessageWithSender {
+  id: string;
+  content: string;
+  created_at: string;
+  sender?: {
+    id: string;
+    name: string;
+  };
 }
 
 const DashboardHeader = () => {
@@ -67,47 +67,79 @@ const DashboardHeader = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [hasUnread, setHasUnread] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
     const handleScroll = () => {
       setScrolled(window.scrollY > 10);
     };
     window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () => {
+      isMountedRef.current = false;
+      window.removeEventListener("scroll", handleScroll);
+    };
   }, []);
 
   useEffect(() => {
-    let isMounted = true;
     const fetchActivity = async () => {
       if (!user) return;
       
       try {
-        const allNotifications: any[] = [];
+        const allNotifications: Notification[] = [];
         
         // Fetch proposals for client, or new invitations for talent
         if (user.role === 'client') {
-          const gigResponse = await api.get<Gig[]>('/my-gigs');
-          if (!isMounted) return;
-          const gigs = gigResponse.data;
-          gigs.forEach((gig) => {
-            if (gig.proposals && gig.proposals.length > 0) {
-              const latestProposal = gig.proposals[0];
-              allNotifications.push({
-                id: `prop-${latestProposal.id}`,
-                title: "New Proposal",
-                description: `${latestProposal.talent?.name || 'A talent'} submitted a proposal for "${gig.title}"`,
-                time: new Date(latestProposal.created_at).toLocaleString(),
-                type: 'proposal',
-                link: `/gigs/${gig.id}`
-              });
-            }
-          });
+          // Fetch client's gigs with proposals
+          const { data: gigs, error: gigsError } = await supabase
+            .from('gigs')
+            .select(`
+              id,
+              title,
+              proposals:proposals(
+                id,
+                created_at,
+                talent:talent_id(name)
+              )
+            `)
+            .eq('client_id', user.id);
+  
+          if (!gigsError && gigs) {
+            (gigs as unknown as GigWithProposals[]).forEach((gig) => {
+              if (gig.proposals && gig.proposals.length > 0) {
+                // Sort proposals by date to get the latest
+                const sortedProposals = [...gig.proposals].sort((a, b) => 
+                  new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                );
+                
+                const latestProposal = sortedProposals[0];
+                allNotifications.push({
+                  id: `prop-${latestProposal.id}`,
+                  title: "New Proposal",
+                  description: `${latestProposal.talent?.name || 'A talent'} submitted a proposal for "${gig.title}"`,
+                  time: new Date(latestProposal.created_at).toLocaleString(),
+                  type: 'proposal',
+                  link: `/gigs/${gig.id}`
+                });
+              }
+            });
+          }
         } else {
-          const invResponse = await api.get<Invitation[]>('/invitations');
-          if (!isMounted) return;
-          const invitations = invResponse.data;
-          invitations.forEach((inv) => {
-            if (inv.status === 'pending') {
+          // Fetch invitations for talent
+          const { data: invitations, error: invError } = await supabase
+            .from('invitations')
+            .select(`
+              id,
+              created_at,
+              status,
+              gig:gig_id(title),
+              client:client_id(name)
+            `)
+            .eq('talent_id', user.id)
+            .eq('status', 'pending');
+  
+          if (!invError && invitations) {
+            (invitations as unknown as InvitationWithDetails[]).forEach((inv) => {
               allNotifications.push({
                 id: `inv-${inv.id}`,
                 title: "New Invitation",
@@ -116,57 +148,87 @@ const DashboardHeader = () => {
                 type: 'system',
                 link: `/invitations`
               });
-            }
-          });
+            });
+          }
         }
         
         // Fetch unread messages for both roles
         try {
-          const msgResponse = await api.get<Conversation[]>('/conversations');
-          if (!isMounted) return;
-          const conversations = msgResponse.data;
-          conversations.forEach((conv) => {
-            if (conv.unread_count > 0) {
+          const { data: unreadMessages, error: msgError } = await supabase
+            .from('messages')
+            .select(`
+              id,
+              content,
+              created_at,
+              sender:sender_id(id, name)
+            `)
+            .eq('receiver_id', user.id)
+            .eq('is_read', false)
+            .order('created_at', { ascending: false });
+  
+          if (!msgError && unreadMessages && unreadMessages.length > 0) {
+            // Group by sender
+            const senderMap = new Map();
+            
+            (unreadMessages as unknown as MessageWithSender[]).forEach((msg) => {
+              const senderId = msg.sender?.id;
+              if (!senderId) return;
+              
+              if (!senderMap.has(senderId)) {
+                senderMap.set(senderId, {
+                  name: msg.sender?.name || 'User',
+                  count: 0,
+                  lastTime: msg.created_at,
+                  lastId: msg.id
+                });
+              }
+              senderMap.get(senderId).count++;
+            });
+            
+            senderMap.forEach((info, senderId) => {
               allNotifications.push({
-                id: `msg-${conv.id}`,
+                id: `msg-${info.lastId}`,
                 title: "New Message",
-                description: `You have ${conv.unread_count} unread messages from ${conv.other_user?.name || 'someone'}`,
-                time: new Date(conv.updated_at).toLocaleString(),
+                description: `You have ${info.count} unread messages from ${info.name}`,
+                time: new Date(info.lastTime).toLocaleString(),
                 type: 'message',
-                link: `/messages/${conv.other_user?.id}`
+                link: `/messages` 
               });
-            }
-          });
+            });
+          }
         } catch (e) {
-          // Messages might not be fully implemented yet
+          console.error("Error processing messages", e);
         }
         
-        if (isMounted) {
+        if (isMountedRef.current) {
           setNotifications(allNotifications.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0, 5));
           setHasUnread(allNotifications.length > 0);
         }
       } catch (error) {
-        if (isMounted) {
+        if (isMountedRef.current) {
           console.error("Failed to fetch notifications", error);
         }
       }
     };
 
-    fetchActivity();
-    // Poll every 60 seconds
-    const interval = setInterval(fetchActivity, 60000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
+    if (user) {
+      fetchActivity();
+      // Set up polling for real-time updates
+      const interval = setInterval(fetchActivity, 30000); 
+      return () => clearInterval(interval);
+    }
   }, [user]);
 
-  const handleLogout = () => {
-    logout();
-    navigate("/");
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      navigate("/", { replace: true });
+    }
   };
 
-  const dashboardLink = user?.role === 'client' ? '/client-dashboard' : '/talent-dashboard';
+  const dashboardLink =
+    user?.role === 'client' ? '/client-dashboard' : user?.role === 'talent' ? '/talent-dashboard' : '/admin';
 
   return (
     <header 
@@ -193,8 +255,6 @@ const DashboardHeader = () => {
 
           {/* User Actions */}
           <div className="flex items-center gap-2">
-            <ModeToggle />
-            
             {/* Notifications */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -222,7 +282,7 @@ const DashboardHeader = () => {
                   <div className="max-h-[400px] overflow-y-auto">
                     {notifications.map((notif) => (
                       <DropdownMenuItem key={notif.id} asChild className="p-0">
-                        <Link to={notif.link} className="flex flex-col items-start gap-1 p-3 cursor-pointer hover:bg-accent transition-colors">
+                        <Link to={notif.link} className="flex flex-col items-start gap-1 p-3 cursor-pointer transition-colors hover:bg-primary/10 dark:hover:bg-primary/15">
                           <div className="flex items-center gap-2 w-full">
                             <div className="bg-primary/10 p-1.5 rounded-md">
                               {notif.type === 'proposal' ? <MessageSquare className="w-3.5 h-3.5 text-primary" /> : <Bell className="w-3.5 h-3.5 text-primary" />}
@@ -236,10 +296,6 @@ const DashboardHeader = () => {
                     ))}
                   </div>
                 )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="justify-center text-xs font-medium text-primary cursor-pointer py-2 hover:bg-primary/5">
-                  View All Notifications
-                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -255,7 +311,7 @@ const DashboardHeader = () => {
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col items-start leading-none text-left mr-1 hidden sm:flex">
-                      <span className="text-sm font-semibold truncate max-w-[100px]">{user?.name.split(' ')[0]}</span>
+                      <span className="text-sm font-semibold truncate max-w-[100px]">{user?.name?.split(' ')[0]}</span>
                       <span className="text-[10px] text-muted-foreground capitalize">{user?.role}</span>
                     </div>
                     <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />

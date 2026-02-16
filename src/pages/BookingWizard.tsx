@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useLocation, useParams, Link, useNavigate } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,7 @@ const usageRights = [
 const BookingWizard = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { isAuthenticated } = useAuthStore();
   const [currentStep, setCurrentStep] = useState(1);
@@ -48,9 +49,9 @@ const BookingWizard = () => {
         title: "Authentication required",
         description: "Please log in to book talent.",
       });
-      navigate("/login");
+      navigate("/login", { state: { from: `${location.pathname}${location.search}`, role: "client" } });
     }
-  }, [isAuthenticated, navigate, toast]);
+  }, [isAuthenticated, location.pathname, location.search, navigate, toast]);
 
   const [formData, setFormData] = useState({
     projectName: "",

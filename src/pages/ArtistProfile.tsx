@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useLocation, useParams, Link, useNavigate } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import WaveformVisualizer from "@/components/audio/WaveformVisualizer";
 import InviteModal from "@/components/invitation/InviteModal";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
 import {
   Play,
   Pause,
@@ -19,66 +20,107 @@ import {
   Share2,
   Heart,
   UserPlus,
+  Loader2,
 } from "lucide-react";
 
-// Mock artist data
-const artistData = {
-  id: "1",
-  name: "Amara Okonkwo",
-  avatar: "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=400&h=400&fit=crop&crop=face",
-  coverImage: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=1200&h=400&fit=crop",
-  location: "Lagos, Nigeria",
-  languages: ["English (Nigerian)", "Yoruba", "Pidgin English"],
-  pricePerWord: 0.15,
-  flatRates: [
-    { words: 100, price: 20 },
-    { words: 250, price: 45 },
-    { words: 500, price: 80 },
-  ],
-  rating: 4.9,
-  reviewCount: 127,
-  completedJobs: 234,
-  isAvailable: true,
-  responseTime: "2 hours",
-  memberSince: "January 2022",
-  bio: "Professional voice-over artist with 8+ years of experience in commercial, documentary, and e-learning projects. My warm, versatile voice has been featured in campaigns for MTN, Coca-Cola Africa, and numerous international brands. I bring authenticity and professionalism to every project.",
-  specialties: ["Commercial", "Documentary", "E-learning", "Corporate", "Animation"],
-  equipment: ["Neumann TLM 103", "Apollo Twin X", "Treated Studio"],
-  demos: [
-    { id: "1", title: "Commercial Demo", duration: "1:32" },
-    { id: "2", title: "Documentary Reel", duration: "2:15" },
-    { id: "3", title: "E-learning Sample", duration: "1:48" },
-  ],
-  reviews: [
-    {
-      id: "1",
-      author: "Michael Chen",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face",
-      rating: 5,
-      date: "2 weeks ago",
-      content: "Amara delivered exceptional quality for our TV commercial. Her Nigerian English accent was exactly what we needed. Quick turnaround and very professional.",
-      project: "TV Commercial - 30 sec",
-    },
-    {
-      id: "2",
-      author: "Lisa Johnson",
-      avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face",
-      rating: 5,
-      date: "1 month ago",
-      content: "Second time working with Amara. She nails the brief every time. The Yoruba pronunciation guide I provided was followed perfectly.",
-      project: "Documentary Narration",
-    },
-  ],
-};
+interface Artist {
+  id: string;
+  name: string;
+  avatar: string;
+  coverImage: string;
+  location: string;
+  languages: string[];
+  pricePerWord: number;
+  flatRates: { words: number; price: number }[];
+  rating: number;
+  reviewCount: number;
+  completedJobs: number;
+  isAvailable: boolean;
+  responseTime: string;
+  memberSince: string;
+  bio: string;
+  specialties: string[];
+  equipment: string[];
+  demos: { id: string | number; title: string; duration: string; file_path: string }[];
+  reviews: Record<string, unknown>[];
+}
 
 const ArtistProfile = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { isAuthenticated } = useAuthStore();
   const [playingDemo, setPlayingDemo] = useState<string | null>(null);
   const [isFavorited, setIsFavorited] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [artist, setArtist] = useState<Artist | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchArtist = async () => {
+      if (!id) return;
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*, demos(*)')
+          .eq('id', id)
+          .single();
+
+        if (error) throw error;
+
+        const talent: Artist = {
+          id: data.id,
+          name: data.name,
+          avatar: data.profile_image || `https://ui-avatars.com/api/?name=${encodeURIComponent(data.name)}&background=random`,
+          coverImage: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=1200&h=400&fit=crop", // Default cover
+          location: "Africa", // Default location
+          languages: (() => {
+            if (!data.skills) return [];
+            if (typeof data.skills === 'string') {
+              try {
+                const parsed = JSON.parse(data.skills);
+                if (Array.isArray(parsed)) return parsed;
+                return data.skills.split(',').map((s: string) => s.trim()).filter(Boolean);
+              } catch (e) {
+                return data.skills.split(',').map((s: string) => s.trim()).filter(Boolean);
+              }
+            }
+            return [];
+          })(),
+          pricePerWord: 0.15,
+          flatRates: [
+            { words: 100, price: 20 },
+            { words: 250, price: 45 },
+            { words: 500, price: 80 },
+          ],
+          rating: 5.0,
+          reviewCount: 0,
+          completedJobs: 0,
+          isAvailable: data.is_available ?? true,
+          responseTime: "24 hours",
+          memberSince: new Date(data.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+          bio: data.bio || "No bio available.",
+          specialties: [], // Can extract from bio or skills
+          equipment: [], // Need a field for this
+          demos: data.demos || [],
+          reviews: [], // Need to fetch reviews
+        };
+        setArtist(talent);
+      } catch (error) {
+        console.error("Failed to fetch artist", error);
+        toast({
+          title: "Error",
+          description: "Failed to load artist profile.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchArtist();
+  }, [id, toast]);
 
   const toggleDemo = (demoId: string) => {
     setPlayingDemo(playingDemo === demoId ? null : demoId);
@@ -90,7 +132,7 @@ const ArtistProfile = () => {
         title: "Authentication required",
         description: "Please log in to perform this action.",
       });
-      navigate("/login");
+      navigate("/login", { state: { from: `${location.pathname}${location.search}`, role: "client" } });
       return;
     }
     action();
@@ -109,7 +151,7 @@ const ArtistProfile = () => {
         title: "Authentication required",
         description: "Please log in to book an artist.",
       });
-      navigate("/login");
+      navigate("/login", { state: { from: `${location.pathname}${location.search}`, role: "client" } });
     }
   };
 
@@ -127,6 +169,25 @@ const ArtistProfile = () => {
     setIsInviteModalOpen(false);
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!artist) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
+        <Header />
+        <p className="text-xl text-muted-foreground">Artist not found.</p>
+        <Button onClick={() => navigate('/artists')}>Back to Artists</Button>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -134,7 +195,7 @@ const ArtistProfile = () => {
         {/* Cover Image */}
         <div className="relative h-48 md:h-64 bg-muted">
           <img
-            src={artistData.coverImage}
+            src={artist.coverImage}
             alt="Studio"
             className="w-full h-full object-cover opacity-80"
           />
@@ -151,11 +212,11 @@ const ArtistProfile = () => {
                   {/* Avatar */}
                   <div className="relative shrink-0">
                     <img
-                      src={artistData.avatar}
-                      alt={artistData.name}
+                      src={artist.avatar}
+                      alt={artist.name}
                       className="w-24 h-24 md:w-32 md:h-32 rounded-2xl object-cover border-4 border-card"
                     />
-                    {artistData.isAvailable && (
+                    {artist.isAvailable && (
                       <div className="absolute -bottom-2 -right-2 bg-accent text-accent-foreground text-xs font-medium px-2 py-1 rounded-full">
                         Available
                       </div>
@@ -167,11 +228,11 @@ const ArtistProfile = () => {
                     <div className="flex items-start justify-between gap-4 mb-3">
                       <div>
                         <h1 className="font-serif text-2xl md:text-3xl font-bold text-foreground mb-1">
-                          {artistData.name}
+                          {artist.name}
                         </h1>
                         <div className="flex items-center gap-2 text-muted-foreground">
                           <MapPin className="w-4 h-4" />
-                          <span>{artistData.location}</span>
+                          <span>{artist.location}</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -197,21 +258,21 @@ const ArtistProfile = () => {
                       <div className="flex items-center gap-1">
                         <Star className="w-5 h-5 fill-secondary text-secondary" />
                         <span className="font-semibold text-foreground">
-                          {artistData.rating}
+                          {artist.rating}
                         </span>
                         <span className="text-muted-foreground">
-                          ({artistData.reviewCount} reviews)
+                          ({artist.reviewCount} reviews)
                         </span>
                       </div>
                       <div className="text-muted-foreground">
                         <CheckCircle2 className="w-4 h-4 inline mr-1" />
-                        {artistData.completedJobs} jobs completed
+                        {artist.completedJobs} jobs completed
                       </div>
                     </div>
 
                     {/* Languages */}
                     <div className="flex flex-wrap gap-2">
-                      {artistData.languages.map((lang) => (
+                      {artist.languages.map((lang) => (
                         <span
                           key={lang}
                           className="text-sm px-3 py-1 bg-muted rounded-full text-muted-foreground"
@@ -230,13 +291,13 @@ const ArtistProfile = () => {
                   About
                 </h2>
                 <p className="text-muted-foreground leading-relaxed mb-6">
-                  {artistData.bio}
+                  {artist.bio}
                 </p>
 
                 {/* Specialties */}
                 <h3 className="font-semibold text-foreground mb-3">Specialties</h3>
                 <div className="flex flex-wrap gap-2 mb-6">
-                  {artistData.specialties.map((specialty) => (
+                  {artist.specialties.map((specialty) => (
                     <span
                       key={specialty}
                       className="text-sm px-3 py-1 bg-primary/10 rounded-full text-primary font-medium"
@@ -249,7 +310,7 @@ const ArtistProfile = () => {
                 {/* Equipment */}
                 <h3 className="font-semibold text-foreground mb-3">Equipment</h3>
                 <div className="flex flex-wrap gap-2">
-                  {artistData.equipment.map((item) => (
+                  {artist.equipment.map((item) => (
                     <span
                       key={item}
                       className="text-sm px-3 py-1 bg-accent/10 rounded-full text-accent"
@@ -266,7 +327,7 @@ const ArtistProfile = () => {
                   Voice Demos
                 </h2>
                 <div className="space-y-4">
-                  {artistData.demos.map((demo) => (
+                  {artist.demos.map((demo) => (
                     <div
                       key={demo.id}
                       className="flex items-center gap-4 p-4 bg-muted/50 rounded-xl"
@@ -274,9 +335,9 @@ const ArtistProfile = () => {
                       <Button
                         variant="default"
                         size="icon"
-                        onClick={() => toggleDemo(demo.id)}
+                        onClick={() => toggleDemo(String(demo.id))}
                       >
-                        {playingDemo === demo.id ? (
+                        {playingDemo === String(demo.id) ? (
                           <Pause className="w-4 h-4" />
                         ) : (
                           <Play className="w-4 h-4 ml-0.5" />
@@ -288,7 +349,7 @@ const ArtistProfile = () => {
                       </div>
                       <div className="flex-1">
                         <WaveformVisualizer
-                          isPlaying={playingDemo === demo.id}
+                          isPlaying={playingDemo === String(demo.id)}
                           barCount={60}
                         />
                       </div>
@@ -301,17 +362,17 @@ const ArtistProfile = () => {
               <div className="bg-card rounded-2xl p-6 shadow-card">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="font-serif text-xl font-semibold text-foreground">
-                    Reviews ({artistData.reviewCount})
+                    Reviews ({artist.reviewCount})
                   </h2>
                   <div className="flex items-center gap-1">
                     <Star className="w-5 h-5 fill-secondary text-secondary" />
                     <span className="font-semibold text-foreground">
-                      {artistData.rating}
+                      {artist.rating}
                     </span>
                   </div>
                 </div>
                 <div className="space-y-6">
-                  {artistData.reviews.map((review) => (
+                  {artist.reviews.map((review) => (
                     <div key={review.id} className="border-b border-border pb-6 last:border-0 last:pb-0">
                       <div className="flex items-start gap-4">
                         <img
@@ -350,7 +411,7 @@ const ArtistProfile = () => {
                     <span className="text-sm text-muted-foreground">Starting at</span>
                     <div className="flex items-baseline gap-1">
                       <span className="text-3xl font-bold text-foreground">
-                        ${artistData.pricePerWord.toFixed(2)}
+                        ${artist.pricePerWord.toFixed(2)}
                       </span>
                       <span className="text-muted-foreground">/word</span>
                     </div>
@@ -359,7 +420,7 @@ const ArtistProfile = () => {
                   {/* Quick Packages */}
                   <div className="space-y-2 mb-6">
                     <h4 className="text-sm font-medium text-foreground mb-3">Quick Packages</h4>
-                    {artistData.flatRates.map((rate) => (
+                    {artist.flatRates.map((rate) => (
                       <div
                         key={rate.words}
                         className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
@@ -374,7 +435,7 @@ const ArtistProfile = () => {
 
                   {/* Book Button */}
                   <Button variant="hero" size="lg" className="w-full mb-3" asChild onClick={handleBookNow}>
-                    <Link to={`/book/${artistData.id}`}>
+                    <Link to={`/book/${artist.id}`}>
                       Book Now
                     </Link>
                   </Button>
@@ -397,7 +458,7 @@ const ArtistProfile = () => {
                         <span className="text-sm">Response time</span>
                       </div>
                       <span className="text-sm font-medium text-foreground">
-                        {artistData.responseTime}
+                        {artist.responseTime}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
@@ -406,7 +467,7 @@ const ArtistProfile = () => {
                         <span className="text-sm">Member since</span>
                       </div>
                       <span className="text-sm font-medium text-foreground">
-                        {artistData.memberSince}
+                        {artist.memberSince}
                       </span>
                     </div>
                   </div>
@@ -424,8 +485,8 @@ const ArtistProfile = () => {
       <InviteModal
         isOpen={isInviteModalOpen}
         onClose={handleCloseInviteModal}
-        artistId={artistData.id}
-        artistName={artistData.name}
+        artistId={artist.id}
+        artistName={artist.name}
       />
     </div>
   );
