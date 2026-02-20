@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -96,16 +97,16 @@ const SettingsView = () => {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Current Password</Label>
-                <Input type="password" />
+                <PasswordInput />
               </div>
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>New Password</Label>
-                  <Input type="password" />
+                  <PasswordInput />
                 </div>
                 <div className="space-y-2">
                   <Label>Confirm Password</Label>
-                  <Input type="password" />
+                  <PasswordInput />
                 </div>
               </div>
             </CardContent>

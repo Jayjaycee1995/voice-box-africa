@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthStore } from "@/store/useAuthStore";
-import { ArrowRight, Loader2, Check } from "lucide-react";
+import { ArrowRight, ArrowLeft, Loader2, Check } from "lucide-react";
 import voiboxLogo from "@/assets/voibox-logo.png";
 
 const Login = () => {
@@ -115,7 +116,7 @@ const Login = () => {
       </div>
 
       {/* Right Side - Form */}
-      <div className="flex flex-col justify-center p-8 md:p-12 lg:p-24 bg-background">
+      <div className="flex flex-col justify-center p-4 md:p-12 lg:p-24 bg-background pb-safe md:pb-0">
         <div className="max-w-md mx-auto w-full space-y-8">
           <div className="text-center lg:text-left">
             <h2 className="text-3xl font-bold font-heading">Log in to your account</h2>
@@ -176,9 +177,8 @@ const Login = () => {
                   Forgot password?
                 </Link>
               </div>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 placeholder="••••••••"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -222,33 +222,14 @@ const Login = () => {
                 </>
               )}
             </Button>
+
+            <p className="text-center text-sm text-muted-foreground mt-4 lg:hidden">
+              <Link to="/" className="text-primary font-medium hover:underline inline-flex items-center gap-1">
+                <ArrowLeft className="w-4 h-4" />
+                Go back to home
+              </Link>
+            </p>
           </form>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Or continue with
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <Button variant="outline" type="button" disabled={isLoading}>
-              <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
-                <path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path>
-              </svg>
-              Google
-            </Button>
-            <Button variant="outline" type="button" disabled={isLoading}>
-              <svg className="mr-2 h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M13.025 1c-2.925 0-4.926 2.053-5.12 2.302-.078.106-.056.273.048.375.105.103.27.085.352-.022.203-.263 2.078-2.536 4.72-2.536 2.226 0 3.794 1.764 3.794 3.794 0 2.226-1.764 3.794-3.794 3.794-2.03 0-3.794-1.568-3.794-3.794 0-.135-.11-.245-.245-.245h-.545c-.135 0-.245.11-.245.245 0 2.527 2.056 4.584 4.584 4.584 2.528 0 4.584-2.057 4.584-4.584C17.61 3.056 15.553 1 13.025 1zM2.553 14.936c.03.09.113.15.208.15h.564c.094 0 .177-.06.207-.15.422-1.264 1.62-2.17 3.022-2.17 1.765 0 3.2 1.435 3.2 3.2 0 1.765-1.435 3.2-3.2 3.2-1.402 0-2.6-1.127-3.022-2.39-.03-.09-.113-.15-.208-.15h-.564c-.094 0-.177.06-.207.15-.422 1.264-1.62 2.17-3.022 2.17-1.765 0-3.2 1.435-3.2 3.2 0 1.765 1.435 3.2 3.2 3.2 1.402 0 2.6-1.127 3.022-2.39.03-.09.113-.15.208-.15h.564c.094 0 .177.06.207.15.422 1.264 1.62 2.17 3.022 2.17 1.765 0 3.2 1.435 3.2 3.2 0 1.765-1.435 3.2-3.2 3.2-1.402 0-2.6-1.127-3.022-2.39-.03-.09-.113-.15-.208-.15h-.564c-.094 0-.177.06-.207.15-.422 1.264-1.62 2.17-3.022 2.17-1.765 0-3.2 1.435-3.2 3.2 0 1.765-1.435 3.2-3.2 3.2-1.402 0-2.6-1.127-3.022-2.39z"></path>
-              </svg>
-              Apple
-            </Button>
-          </div>
         </div>
       </div>
     </div>

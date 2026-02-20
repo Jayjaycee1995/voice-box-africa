@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -168,12 +169,9 @@ const Register = () => {
            <Button variant="ghost" asChild className="gap-2 text-muted-foreground hover:text-primary">
              <Link to="/"><ChevronLeft className="w-4 h-4" /> Back to Home</Link>
            </Button>
-           <p className="text-sm text-muted-foreground">
-             Already have an account? <Link to="/login" state={{ from: (location.state as { from?: unknown } | null)?.from ?? null, role: userType }} className="text-primary font-medium hover:underline">Sign in</Link>
-           </p>
         </div>
 
-        <ScrollArea className="flex-1 p-6 md:p-12">
+        <ScrollArea className="flex-1 p-4 md:p-12 pb-safe md:pb-0">
           <div className="max-w-md mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="text-center space-y-2">
               <h2 className="text-2xl font-bold font-heading">Create an account</h2>
@@ -226,11 +224,11 @@ const Register = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Password</Label>
-                    <Input type="password" placeholder="••••••••" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
+                    <PasswordInput placeholder="••••••••" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
                   </div>
                   <div className="space-y-2">
                     <Label>Confirm Password</Label>
-                    <Input type="password" placeholder="••••••••" value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} />
+                    <PasswordInput placeholder="••••••••" value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} />
                   </div>
                 </div>
                 
@@ -245,6 +243,10 @@ const Register = () => {
                   {isLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                   Create Account
                 </Button>
+
+                <p className="text-sm text-muted-foreground text-center lg:hidden mt-4">
+                  Already have an account? <Link to="/login" state={{ from: (location.state as { from?: unknown } | null)?.from ?? null, role: userType }} className="text-primary font-medium hover:underline">Sign in</Link>
+                </p>
               </div>
             )}
 
@@ -271,11 +273,11 @@ const Register = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Password</Label>
-                        <Input type="password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
+                        <PasswordInput value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
                       </div>
                       <div className="space-y-2">
                         <Label>Confirm</Label>
-                        <Input type="password" value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} />
+                        <PasswordInput value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} />
                       </div>
                     </div>
                     <Button className="w-full mt-4 bg-secondary hover:bg-secondary/90 text-secondary-foreground" onClick={() => setStep(2)}>Continue</Button>
@@ -377,6 +379,10 @@ const Register = () => {
                     </div>
                   </div>
                 )}
+
+                <p className="text-sm text-muted-foreground text-center lg:hidden mt-6">
+                  Already have an account? <Link to="/login" state={{ from: (location.state as { from?: unknown } | null)?.from ?? null, role: userType }} className="text-primary font-medium hover:underline">Sign in</Link>
+                </p>
               </div>
             )}
           </div>

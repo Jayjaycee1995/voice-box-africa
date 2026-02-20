@@ -1,10 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Play, Mic } from "lucide-react";
+import { useScrollAnimation } from "@/hooks/use-scroll-animation";
 
 const HeroSection = () => {
+  const { ref, isVisible } = useScrollAnimation({ threshold: 0.2 });
+
   return (
-    <section className="relative py-20 md:py-28 overflow-hidden">
+    <section ref={ref} className="relative py-20 md:py-28 overflow-hidden">
       {/* Background gradient */}
       <div className="absolute inset-0 hero-gradient" />
       
@@ -16,24 +19,24 @@ const HeroSection = () => {
           {/* Left Content */}
           <div className="max-w-xl">
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary mb-6">
+            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary mb-6 transition-all duration-500 ${isVisible ? 'animate-in fade-in slide-in-from-left-4' : 'opacity-0 translate-x-4'}`}>
               <Mic className="w-4 h-4" />
               <span className="text-sm font-medium">Africa's Premier Voice Marketplace</span>
             </div>
             
-            <h1 className="font-heading text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6 leading-tight">
+            <h1 className={`font-heading text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6 leading-tight transition-all duration-500 delay-100 ${isVisible ? 'animate-in fade-in slide-in-from-left-4' : 'opacity-0 translate-x-4'}`}>
               <span className="gradient-brand-text">Africa Has</span>
               <br />
               <span className="gradient-brand-text">a Voice.</span>
             </h1>
             
-            <p className="text-lg md:text-xl text-muted-foreground mb-8 leading-relaxed">
+            <p className={`text-lg md:text-xl text-muted-foreground mb-8 leading-relaxed transition-all duration-500 delay-200 ${isVisible ? 'animate-in fade-in slide-in-from-left-4' : 'opacity-0 translate-x-4'}`}>
               Discover powerful African voices for your next project. 
               From local accents to global excellence — hire verified 
               voice talents directly.
             </p>
             
-            <div className="flex flex-wrap gap-4">
+            <div className={`flex flex-wrap gap-4 transition-all duration-500 delay-300 ${isVisible ? 'animate-in fade-in slide-in-from-left-4' : 'opacity-0 translate-x-4'}`}>
               <Button variant="hero" size="xl" asChild>
                 <Link to="/artists">
                   <Play className="w-5 h-5" />
@@ -46,7 +49,7 @@ const HeroSection = () => {
             </div>
             
             {/* Trust indicators */}
-            <div className="mt-10 pt-8 border-t border-border">
+            <div className={`mt-10 pt-8 border-t border-border transition-all duration-500 delay-400 ${isVisible ? 'animate-in fade-in slide-in-from-left-4' : 'opacity-0 translate-x-4'}`}>
               <p className="text-sm text-muted-foreground mb-4">Trusted by leading brands across Africa</p>
               <div className="flex items-center gap-8 text-muted-foreground">
                 <span className="font-heading font-bold text-foreground">MTN</span>
@@ -58,7 +61,7 @@ const HeroSection = () => {
           </div>
 
           {/* Right Visual */}
-          <div className="relative hidden lg:block">
+          <div className={`relative hidden lg:block transition-all duration-500 delay-300 ${isVisible ? 'animate-in fade-in slide-in-from-right-4' : 'opacity-0 -translate-x-4'}`}>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-4">
                 <div className="rounded-2xl overflow-hidden shadow-xl">

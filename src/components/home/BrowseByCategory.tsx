@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Mic, Radio, BookOpen, Tv, Gamepad2, Phone, Globe, Headphones } from "lucide-react";
+import { useScrollAnimation, useStaggerAnimation } from "@/hooks/use-scroll-animation";
 
 const categories = [
   {
@@ -53,8 +54,11 @@ const categories = [
 ];
 
 const BrowseByCategory = () => {
+  const { ref, isVisible } = useScrollAnimation({ threshold: 0.2 });
+  const staggerDelays = useStaggerAnimation(categories.length, 75);
+
   return (
-    <section className="py-16 md:py-24 bg-background">
+    <section ref={ref} className="py-16 md:py-24 bg-background">
       <div className="container mx-auto px-4">
         {/* Header */}
         <div className="flex items-end justify-between mb-10">
@@ -68,11 +72,12 @@ const BrowseByCategory = () => {
 
         {/* Category Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {categories.map((category) => (
+          {categories.map((category, index) => (
             <Link
               key={category.title}
               to={category.link}
-              className="category-card group"
+              className={`category-card group transition-all duration-500 ${isVisible ? 'animate-in fade-in slide-in-from-bottom-4' : 'opacity-0 translate-y-4'}`}
+              style={{ transitionDelay: isVisible ? `${staggerDelays[index]}ms` : '0ms' }}
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-secondary/20 to-primary/20 flex items-center justify-center group-hover:from-secondary/30 group-hover:to-primary/30 transition-colors">

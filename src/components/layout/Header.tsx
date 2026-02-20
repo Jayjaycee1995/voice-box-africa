@@ -40,9 +40,14 @@ import { cn } from "@/lib/utils";
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
   const { user, logout, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    setIsLoaded(true);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -91,12 +96,12 @@ const Header = () => {
             <img 
               src={voiboxLogo} 
               alt="VOICEBOX Africa" 
-              className="h-9 w-auto transition-all duration-300 group-hover:brightness-110" 
+              className={`h-9 w-auto transition-all duration-500 group-hover:brightness-110 ${isLoaded ? 'animate-in fade-in slide-in-from-left' : 'opacity-0 -translate-x-4'}`}
             />
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center gap-4">
+          <div className={`hidden lg:flex items-center gap-4 transition-all duration-500 ${isLoaded ? 'animate-in fade-in slide-in-from-top' : 'opacity-0 -translate-y-2'}`}>
             <NavigationMenu>
               <NavigationMenuList className="gap-1">
                 {/* Find Talent */}
@@ -253,7 +258,7 @@ const Header = () => {
                 </DropdownMenu>
               </div>
             ) : (
-              <div className="flex items-center gap-3 ml-2 animate-in fade-in duration-500">
+              <div className={`flex items-center gap-3 ml-2 transition-all duration-500 ${isLoaded ? 'animate-in fade-in slide-in-from-right' : 'opacity-0 translate-x-4'}`}>
                 <Button variant="ghost" asChild className="font-semibold text-[15px] hover:bg-primary/5 px-6 dark:hover:bg-primary/10 dark:hover:backdrop-blur-md dark:hover:bg-opacity-20 dark:border dark:border-transparent dark:hover:border-primary/20 transition-all duration-200">
                   <Link to="/login">Log In</Link>
                 </Button>
@@ -278,13 +283,14 @@ const Header = () => {
 
         {/* Mobile Menu */}
         {isMenuOpen && (
-          <div className="lg:hidden fixed inset-0 top-[65px] bg-background/98 backdrop-blur-xl z-50 animate-in fade-in slide-in-from-right duration-300">
+          <div className="lg:hidden fixed inset-0 top-[65px] bg-background/98 backdrop-blur-xl z-50 animate-in fade-in slide-in-from-left duration-500">
             <nav className="flex flex-col h-full container mx-auto px-4 py-8 gap-6 overflow-y-auto">
-              <div className="grid gap-2">
-                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider px-2 mb-1">Navigation</p>
+              <div className="grid gap-2 animate-in slide-in-from-left duration-500">
+                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider px-2 mb-1 animate-in fade-in slide-in-from-left duration-500" style={{ animationDelay: '50ms' }}>Navigation</p>
                 <Link
                   to="/artists"
-                  className="px-4 py-3.5 text-lg font-semibold hover:bg-accent rounded-xl transition-all flex items-center justify-between group"
+                  className="px-4 py-3.5 text-lg font-semibold hover:bg-accent rounded-xl transition-all flex items-center justify-between group animate-in fade-in slide-in-from-left duration-500"
+                  style={{ animationDelay: '100ms' }}
                   onClick={() => setIsMenuOpen(false)}
                 >
                   <div className="flex items-center gap-3">
@@ -300,7 +306,8 @@ const Header = () => {
                     handleProtectedAction("/post-gig");
                     setIsMenuOpen(false);
                   }}
-                  className="px-4 py-3.5 text-lg font-semibold hover:bg-accent rounded-xl transition-all flex items-center justify-between group text-left w-full"
+                  className="px-4 py-3.5 text-lg font-semibold hover:bg-accent rounded-xl transition-all flex items-center justify-between group text-left w-full animate-in fade-in slide-in-from-left duration-500"
+                  style={{ animationDelay: '150ms' }}
                 >
                   <div className="flex items-center gap-3">
                     <div className="bg-primary/10 p-2 rounded-lg group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
@@ -313,7 +320,8 @@ const Header = () => {
                 <Link
                   to="/browse-gigs"
                   onClick={() => setIsMenuOpen(false)}
-                  className="px-4 py-3.5 text-lg font-semibold hover:bg-accent rounded-xl transition-all flex items-center justify-between group text-left w-full"
+                  className="px-4 py-3.5 text-lg font-semibold hover:bg-accent rounded-xl transition-all flex items-center justify-between group text-left w-full animate-in fade-in slide-in-from-left duration-500"
+                  style={{ animationDelay: '200ms' }}
                 >
                   <div className="flex items-center gap-3">
                     <div className="bg-primary/10 p-2 rounded-lg group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
@@ -325,7 +333,8 @@ const Header = () => {
                 </Link>
                 <Link
                   to="/how-it-works"
-                  className="px-4 py-3.5 text-lg font-semibold hover:bg-accent rounded-xl transition-all flex items-center gap-3"
+                  className="px-4 py-3.5 text-lg font-semibold hover:bg-accent rounded-xl transition-all flex items-center gap-3 animate-in fade-in slide-in-from-left duration-500"
+                  style={{ animationDelay: '250ms' }}
                   onClick={() => setIsMenuOpen(false)}
                 >
                   <div className="bg-primary/10 p-2 rounded-lg">

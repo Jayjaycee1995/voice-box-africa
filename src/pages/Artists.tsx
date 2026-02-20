@@ -155,7 +155,7 @@ const Artists = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="pt-20 md:pt-24 pb-12">
+      <main className="pt-24 md:pt-32 pb-12">
         <div className="container mx-auto px-4">
           {/* Page Header */}
           <div className="mb-8">

@@ -1,4 +1,5 @@
 import { Star, Shield, Award, Zap } from "lucide-react";
+import { useScrollAnimation, useStaggerAnimation } from "@/hooks/use-scroll-animation";
 
 const features = [
   {
@@ -24,20 +25,23 @@ const stats = [
 ];
 
 const WhyVoiceBoxSection = () => {
+  const { ref, isVisible } = useScrollAnimation({ threshold: 0.2 });
+  const staggerDelays = useStaggerAnimation(features.length, 100);
+
   return (
-    <section className="py-16 md:py-24 bg-background">
+    <section ref={ref} className="py-16 md:py-24 bg-background">
       <div className="container mx-auto px-4">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Left Content */}
           <div>
-            <p className="text-sm font-medium text-secondary mb-2">Why choose us</p>
-            <h2 className="font-heading text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-10">
+            <p className={`text-sm font-medium text-secondary mb-2 transition-all duration-500 ${isVisible ? 'animate-in fade-in slide-in-from-left-4' : 'opacity-0 translate-x-4'}`}>Why choose us</p>
+            <h2 className={`font-heading text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-10 transition-all duration-500 delay-100 ${isVisible ? 'animate-in fade-in slide-in-from-left-4' : 'opacity-0 translate-x-4'}`}>
               Why businesses turn to <span className="gradient-brand-text">VoiceBox</span>
             </h2>
 
             <div className="space-y-8">
-              {features.map((feature) => (
-                <div key={feature.title} className="flex gap-4">
+              {features.map((feature, index) => (
+                <div key={feature.title} className={`flex gap-4 transition-all duration-500 ${isVisible ? 'animate-in fade-in slide-in-from-left-4' : 'opacity-0 translate-x-4'}`} style={{ transitionDelay: isVisible ? `${staggerDelays[index]}ms` : '0ms' }}>
                   <div className="shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-secondary/10 to-primary/10 flex items-center justify-center">
                     <feature.icon className="w-6 h-6 text-primary" />
                   </div>
@@ -53,7 +57,7 @@ const WhyVoiceBoxSection = () => {
           </div>
 
           {/* Right Stats Card */}
-          <div className="bg-gradient-to-br from-navy to-navy/90 rounded-2xl p-8 lg:p-12 text-white relative overflow-hidden">
+          <div className={`bg-gradient-to-br from-navy to-navy/90 rounded-2xl p-8 lg:p-12 text-white relative overflow-hidden transition-all duration-500 delay-300 ${isVisible ? 'animate-in fade-in slide-in-from-right-4' : 'opacity-0 -translate-x-4'}`}>
             {/* Decorative */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-secondary/20 to-primary/20 rounded-full blur-3xl" />
             

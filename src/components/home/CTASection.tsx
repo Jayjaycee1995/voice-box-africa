@@ -1,14 +1,17 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Mic2 } from "lucide-react";
+import { useScrollAnimation } from "@/hooks/use-scroll-animation";
 
 const CTASection = () => {
+  const { ref, isVisible } = useScrollAnimation({ threshold: 0.2 });
+
   return (
-    <section className="py-16 md:py-24 bg-muted/50 relative overflow-hidden">
+    <section ref={ref} className="py-16 md:py-24 bg-muted/50 relative overflow-hidden">
       <div className="container mx-auto px-4 relative z-10">
         <div className="grid lg:grid-cols-2 gap-8 items-stretch">
           {/* For Clients */}
-          <div className="card-gradient p-8 md:p-10">
+          <div className={`card-gradient p-8 md:p-10 transition-all duration-500 ${isVisible ? 'animate-in fade-in slide-in-from-left-4' : 'opacity-0 translate-x-4'}`}>
             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
               For Clients
             </span>
@@ -28,7 +31,7 @@ const CTASection = () => {
           </div>
 
           {/* For Talent */}
-          <div className="bg-gradient-to-br from-navy to-navy/90 rounded-2xl p-8 md:p-10 text-white relative overflow-hidden">
+          <div className={`bg-gradient-to-br from-navy to-navy/90 rounded-2xl p-8 md:p-10 text-white relative overflow-hidden transition-all duration-500 delay-200 ${isVisible ? 'animate-in fade-in slide-in-from-right-4' : 'opacity-0 -translate-x-4'}`}>
             {/* Decorative */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-secondary/20 to-primary/20 rounded-full blur-2xl" />
             

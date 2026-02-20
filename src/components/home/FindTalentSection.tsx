@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, Search, Users, Headphones } from "lucide-react";
+import { useScrollAnimation, useStaggerAnimation } from "@/hooks/use-scroll-animation";
 
 const options = [
   {
@@ -26,12 +27,15 @@ const options = [
 ];
 
 const FindTalentSection = () => {
+  const { ref, isVisible } = useScrollAnimation({ threshold: 0.2 });
+  const staggerDelays = useStaggerAnimation(options.length, 100);
+
   return (
-    <section className="py-16 md:py-24 bg-muted/50">
+    <section ref={ref} className="py-16 md:py-24 bg-muted/50">
       <div className="container mx-auto px-4">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Left Image */}
-          <div className="relative hidden lg:block">
+          <div className={`relative hidden lg:block transition-all duration-500 delay-300 ${isVisible ? 'animate-in fade-in slide-in-from-left-4' : 'opacity-0 translate-x-4'}`}>
             <div className="rounded-2xl overflow-hidden shadow-xl">
               <img
                 src="https://images.unsplash.com/photo-1516321497487-e288fb19713f?w=600&h=500&fit=crop"
@@ -46,23 +50,24 @@ const FindTalentSection = () => {
 
           {/* Right Content */}
           <div>
-            <p className="text-sm font-medium text-secondary mb-2">For clients</p>
-            <h2 className="font-heading text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
+            <p className={`text-sm font-medium text-secondary mb-2 transition-all duration-500 ${isVisible ? 'animate-in fade-in slide-in-from-right-4' : 'opacity-0 -translate-x-4'}`}>For clients</p>
+            <h2 className={`font-heading text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4 transition-all duration-500 delay-100 ${isVisible ? 'animate-in fade-in slide-in-from-right-4' : 'opacity-0 -translate-x-4'}`}>
               Find talent
               <br />
               <span className="gradient-brand-text">your way</span>
             </h2>
-            <p className="text-muted-foreground text-lg mb-8 leading-relaxed">
+            <p className={`text-muted-foreground text-lg mb-8 leading-relaxed transition-all duration-500 delay-200 ${isVisible ? 'animate-in fade-in slide-in-from-right-4' : 'opacity-0 -translate-x-4'}`}>
               Work with the largest network of African voice professionals and get things done—from quick turnarounds to big transformations.
             </p>
 
             {/* Options */}
             <div className="grid gap-4">
-              {options.map((option) => (
+              {options.map((option, index) => (
                 <Link
                   key={option.title}
                   to={option.link}
-                  className="group bg-card p-6 rounded-xl border border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300"
+                  className={`group bg-card p-6 rounded-xl border border-border hover:border-primary/50 hover:shadow-lg transition-all duration-500 ${isVisible ? 'animate-in fade-in slide-in-from-right-4' : 'opacity-0 -translate-x-4'}`}
+                  style={{ transitionDelay: isVisible ? `${staggerDelays[index]}ms` : '0ms' }}
                 >
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-secondary/10 to-primary/10 flex items-center justify-center shrink-0 group-hover:from-secondary/20 group-hover:to-primary/20 transition-colors">
