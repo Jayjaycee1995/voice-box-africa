@@ -24,7 +24,9 @@ import Messages from "./pages/Messages";
 import AdminPanel from "./pages/AdminPanel";
 import Terms from "./pages/Terms";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
+import CookieConsent from "./components/layout/CookieConsent";
 
 const queryClient = new QueryClient();
 
@@ -186,6 +188,10 @@ const AnimatedRoutes = () => {
             </RequireRole>
           }
         />
+        <Route
+          path="/contact"
+          element={<Contact />}
+        />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>
@@ -208,6 +214,7 @@ const App = () => {
       <BrowserRouter>
         <ScrollToTop />
         <AnimatedRoutes />
+        <CookieConsent />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
