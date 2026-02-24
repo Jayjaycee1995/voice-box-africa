@@ -1,4 +1,5 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// @ts-nocheck - Deno-specific code, skip type checking in Node.js environment
+import { createClient } from "@supabase/supabase-js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -83,9 +84,9 @@ Deno.serve(async (req: Request) => {
     // Delete child rows in dependency order to avoid FK violations
     const tables: Array<{ table: string; column: string | string[] }> = [
       { table: "messages",    column: ["sender_id", "receiver_id"] },
-      { table: "proposals",   column: "talent_id" },
-      { table: "invitations", column: "talent_id" },
-      { table: "demos",       column: "talent_id" },
+      { table: "proposals",   column: ["talent_id", "client_id"] },
+      { table: "invitations", column: ["talent_id", "client_id"] },
+      { table: "demos",       column: "user_id" },
       { table: "gigs",        column: "client_id" },
     ];
 
@@ -94,16 +95,36 @@ Deno.serve(async (req: Request) => {
         // Delete rows where the user appears in any of the listed columns
         for (const col of column) {
           const { error } = await adminClient.from(table).delete().eq(col, userId);
-          if (error) console.error(`Error deleting from ${table} (${col}):`, error.message);
+          if (error) {
+            console.error(`Error deleting from ${table} (${col}):`, error.message);
+            // Return error instead of continuing
+            return new Response(JSON.stringify({ error: `Failed to delete from ${table}: ${error.message}` }), {
+              status: 500,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
         }
       } else {
         const { error } = await adminClient.from(table).delete().eq(column, userId);
-        if (error) console.error(`Error deleting from ${table} (${column}):`, error.message);
+        if (error) {
+          console.error(`Error deleting from ${table} (${column}):`, error.message);
+          return new Response(JSON.stringify({ error: `Failed to delete from ${table}: ${error.message}` }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
       }
     }
 
     // Delete the public users row
-    await adminClient.from("users").delete().eq("id", userId);
+    const { error: usersDeleteError } = await adminClient.from("users").delete().eq("id", userId);
+    if (usersDeleteError) {
+      console.error("Error deleting from users:", usersDeleteError.message);
+      return new Response(JSON.stringify({ error: `Failed to delete user profile: ${usersDeleteError.message}` }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Finally delete the auth user
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
