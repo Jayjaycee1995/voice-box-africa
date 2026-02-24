@@ -1,16 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { 
-  LayoutDashboard, 
-  Users, 
-  FileText, 
-  LogOut, 
-  Search, 
+import {
+  LayoutDashboard,
+  Users,
+  FileText,
+  LogOut,
+  Search,
   Bell,
   Menu,
-  MoreVertical,
+  Trash2,
   Activity,
-  Mic
+  Mic,
+  AlertTriangle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,12 +22,23 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuthStore } from "@/store/useAuthStore";
 import { supabase } from "@/lib/supabase";
 import voiboxLogo from "@/assets/voibox-logo.png";
+import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -41,7 +53,10 @@ export default function AdminPanel() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [confirmDeleteUser, setConfirmDeleteUser] = useState<{ id: string; name: string } | null>(null);
   const [stats, setStats] = useState([
     { label: "Total Users", value: "0", icon: Users, color: "bg-blue-100 text-blue-700" },
     { label: "Clients", value: "0", icon: FileText, color: "bg-purple-100 text-purple-700" },
@@ -57,6 +72,46 @@ export default function AdminPanel() {
       await logout();
     } finally {
       navigate("/", { replace: true });
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    setDeletingUserId(userId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+      const res = await fetch(`${supabaseUrl}/functions/v1/delete-user`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ userId }),
+      });
+
+      const json = await res.json() as { success?: boolean; error?: string };
+      if (!res.ok || !json.success) {
+        throw new Error(json.error ?? "Failed to delete user");
+      }
+
+      // Remove from local state
+      setRecentUsers((prev) => prev.filter((u) => u.id !== userId));
+      setStats((prev) =>
+        prev.map((s) => {
+          if (s.label === "Total Users") return { ...s, value: String(Number(s.value) - 1) };
+          return s;
+        })
+      );
+
+      toast({ title: "User deleted", description: "The user has been permanently removed." });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to delete user";
+      toast({ title: "Error", description: message, variant: "destructive" });
+    } finally {
+      setDeletingUserId(null);
+      setConfirmDeleteUser(null);
     }
   };
 
@@ -311,7 +366,19 @@ export default function AdminPanel() {
                          <TableCell className="capitalize">{u.role}</TableCell>
                         <TableCell>{new Date(u.created_at).toLocaleDateString()}</TableCell>
                          <TableCell className="text-right">
-                           <Button variant="ghost" size="icon"><MoreVertical className="w-4 h-4" /></Button>
+                           <Button
+                             variant="ghost"
+                             size="icon"
+                             className="text-muted-foreground hover:text-destructive"
+                             disabled={deletingUserId === u.id || u.id === user?.id}
+                             onClick={() => setConfirmDeleteUser({ id: u.id, name: u.name })}
+                           >
+                             {deletingUserId === u.id ? (
+                               <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin inline-block" />
+                             ) : (
+                               <Trash2 className="w-4 h-4" />
+                             )}
+                           </Button>
                          </TableCell>
                        </TableRow>
                      ))}
@@ -324,6 +391,34 @@ export default function AdminPanel() {
           {/* Other tabs can be implemented similarly */}
         </main>
       </div>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog
+        open={!!confirmDeleteUser}
+        onOpenChange={(open) => { if (!open) setConfirmDeleteUser(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+              Delete user account
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete <strong>{confirmDeleteUser?.name}</strong> and all their
+              associated data (messages, proposals, gigs, demos). This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => confirmDeleteUser && handleDeleteUser(confirmDeleteUser.id)}
+            >
+              Delete permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
