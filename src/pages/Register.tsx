@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +42,10 @@ const Register = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isLoading, setIsLoading] = useState(false);
+  const redirectTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Cancel any pending redirect if the component unmounts before the timer fires
+  useEffect(() => () => clearTimeout(redirectTimerRef.current), []);
   const [step, setStep] = useState(1);
   const [customLanguage, setCustomLanguage] = useState("");
   const [formData, setFormData] = useState({
@@ -99,14 +103,18 @@ const Register = () => {
       
       toast({
         title: "Registration successful!",
-        description: "Please check your email to confirm your account.",
+        description: "Welcome! You can now sign in to your account.",
       });
 
       const from = typeof (location.state as { from?: unknown } | null)?.from === "string"
         ? (location.state as { from?: string }).from
         : null;
 
-      navigate("/login", { state: { from, role: userType } });
+      // Small delay so the user sees the success toast before being redirected.
+      // The ref lets us cancel this if the component unmounts first.
+      redirectTimerRef.current = setTimeout(() => {
+        navigate("/login", { state: { from, role: userType } });
+      }, 1500);
       
     } catch (error) {
       console.error(error);

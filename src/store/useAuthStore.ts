@@ -101,7 +101,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ loading: false });
       throw error;
     }
-    // State update handled by onAuthStateChange
+    // signUp with email confirmation does NOT fire SIGNED_IN via onAuthStateChange,
+    // so we must reset loading manually here.
+    // Note: login() intentionally leaves this to onAuthStateChange instead.
+    set({ loading: false });
   },
 
   logout: async () => {

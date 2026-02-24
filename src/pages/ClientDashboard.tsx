@@ -28,6 +28,7 @@ import MessagesView from "@/components/dashboard/MessagesView";
 import ProjectsView from "@/components/dashboard/ProjectsView";
 import PaymentsView from "@/components/dashboard/PaymentsView";
 import SettingsView from "@/components/dashboard/SettingsView";
+import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
 import { format, formatDistanceToNow } from "date-fns";
 
 type TabType = "overview" | "projects" | "messages" | "payments" | "settings";
@@ -197,7 +198,7 @@ const ClientDashboard = () => {
     <div className="min-h-screen bg-muted/30">
       <DashboardHeader />
       <div className="flex pt-16 min-h-screen">
-        {/* Sidebar Navigation */}
+        {/* Sidebar Navigation - Desktop only */}
         <aside className="hidden lg:flex flex-col w-64 fixed h-full bg-background border-r border-border pt-6 pb-4 px-4 z-10">
            <div className="space-y-1">
              {tabs.map((tab) => (
@@ -205,8 +206,8 @@ const ClientDashboard = () => {
                  key={tab.id}
                  onClick={() => setActiveTab(tab.id as TabType)}
                  className={`w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all ${
-                   activeTab === tab.id 
-                     ? "bg-primary text-primary-foreground shadow-md" 
+                   activeTab === tab.id
+                     ? "bg-primary text-primary-foreground shadow-md"
                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                  }`}
                >
@@ -239,8 +240,15 @@ const ClientDashboard = () => {
            </div>
         </aside>
 
+        {/* Mobile Bottom Navigation */}
+        <MobileBottomNav
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={(id) => setActiveTab(id as TabType)}
+        />
+
         {/* Main Content */}
-        <main className="flex-1 lg:ml-64 p-4 md:p-8 overflow-y-auto">
+        <main className="flex-1 lg:ml-64 p-4 md:p-8 pb-24 lg:pb-8 overflow-y-auto">
           <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
             {activeTab === "overview" && (
               <>
@@ -366,31 +374,33 @@ const ClientDashboard = () => {
                          </div>
                        ) : (
                          recentProjects.map((project) => (
-                           <div key={project.id} className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl border border-border/50 hover:bg-muted/30 transition-colors bg-card/50">
-                             <div className="flex items-center gap-4">
-                               <Avatar className="w-12 h-12 rounded-lg">
-                                 <AvatarFallback>VO</AvatarFallback>
-                               </Avatar>
-                               <div>
-                                 <h4 className="font-semibold text-foreground">{project.title}</h4>
-                                 <p className="text-sm text-muted-foreground">Budget: ${project.budget}</p>
+                           <div key={project.id} className="flex flex-col gap-3 p-4 rounded-xl border border-border/50 hover:bg-muted/30 transition-colors bg-card/50">
+                             <div className="flex items-center justify-between gap-4">
+                               <div className="flex items-center gap-3 min-w-0">
+                                 <Avatar className="w-10 h-10 rounded-lg flex-shrink-0">
+                                   <AvatarFallback>VO</AvatarFallback>
+                                 </Avatar>
+                                 <div className="min-w-0">
+                                   <h4 className="font-semibold text-foreground truncate">{project.title}</h4>
+                                   <p className="text-sm text-muted-foreground">Budget: ${project.budget}</p>
+                                 </div>
                                </div>
-                             </div>
-                             <div className="flex items-center gap-6">
-                               <div className="text-right">
-                                 <p className="text-sm font-medium text-foreground">${project.budget}</p>
-                                 <p className="text-xs text-muted-foreground">Budget</p>
-                               </div>
-                               <div className="text-right">
-                                 <p className="text-sm font-medium text-foreground">{format(new Date(project.deadline), 'MMM dd, yyyy')}</p>
-                                 <p className="text-xs text-muted-foreground">Deadline</p>
-                               </div>
-                               <Badge className={`${statusConfig[project.status as keyof typeof statusConfig]?.color || "bg-gray-100 text-gray-700"} px-3 py-1 rounded-full capitalize`}>
-                                 {statusConfig[project.status as keyof typeof statusConfig]?.label || project.status}
-                               </Badge>
-                               <Button variant="ghost" size="icon">
+                               <Button variant="ghost" size="icon" className="flex-shrink-0">
                                  <MoreVertical className="w-4 h-4 text-muted-foreground" />
                                </Button>
+                             </div>
+                             <div className="flex flex-wrap items-center gap-3">
+                               <div>
+                                 <p className="text-xs text-muted-foreground">Budget</p>
+                                 <p className="text-sm font-medium text-foreground">${project.budget}</p>
+                               </div>
+                               <div>
+                                 <p className="text-xs text-muted-foreground">Deadline</p>
+                                 <p className="text-sm font-medium text-foreground">{format(new Date(project.deadline), 'MMM dd, yyyy')}</p>
+                               </div>
+                               <Badge className={`${statusConfig[project.status as keyof typeof statusConfig]?.color || "bg-gray-100 text-gray-700"} px-3 py-1 rounded-full capitalize ml-auto`}>
+                                 {statusConfig[project.status as keyof typeof statusConfig]?.label || project.status}
+                               </Badge>
                              </div>
                            </div>
                          ))

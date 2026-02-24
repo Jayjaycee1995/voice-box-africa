@@ -75,7 +75,7 @@ const PaymentsView = ({ role }: { role: 'client' | 'talent' }) => {
 
           if (error) throw error;
 
-          const proposals = (data ?? []) as Array<{
+          const proposals = (data ?? []) as unknown as Array<{
             id: number;
             bid_amount: number;
             status: "pending" | "accepted" | "rejected";
@@ -158,7 +158,7 @@ const PaymentsView = ({ role }: { role: 'client' | 'talent' }) => {
         <CardHeader>
           <CardTitle>Transaction History</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0 sm:p-6">
           {isLoading ? (
             <div className="flex justify-center items-center py-12">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -166,33 +166,35 @@ const PaymentsView = ({ role }: { role: 'client' | 'talent' }) => {
           ) : rows.length === 0 ? (
             <div className="py-10 text-center text-muted-foreground">No transactions yet.</div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((tx) => (
-                  <TableRow key={tx.id}>
-                    <TableCell>{tx.date}</TableCell>
-                    <TableCell>
-                      <div className="font-medium">{tx.description}</div>
-                      <div className="text-xs text-muted-foreground">{tx.id}</div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={tx.status === 'accepted' || tx.status === 'completed' ? 'default' : 'secondary'} className="capitalize">
-                        {tx.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-medium">{tx.amount}</TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="whitespace-nowrap">Date</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="whitespace-nowrap">Status</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">Amount</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((tx) => (
+                    <TableRow key={tx.id}>
+                      <TableCell className="whitespace-nowrap">{tx.date}</TableCell>
+                      <TableCell>
+                        <div className="font-medium">{tx.description}</div>
+                        <div className="text-xs text-muted-foreground">{tx.id}</div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={tx.status === 'accepted' || tx.status === 'completed' ? 'default' : 'secondary'} className="capitalize whitespace-nowrap">
+                          {tx.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-medium whitespace-nowrap">{tx.amount}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

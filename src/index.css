@@ -315,6 +315,11 @@
   .animate-sound-wave {
     animation: soundWave 1s ease-in-out infinite;
   }
+
+  /* Safe area padding for iOS devices (bottom navigation) */
+  .safe-area-pb {
+    padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
+  }
 }
 
 * {

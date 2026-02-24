@@ -34,11 +34,15 @@ const SettingsView = () => {
       </div>
 
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="profile" className="gap-2"><User className="w-4 h-4" /> Profile</TabsTrigger>
-          <TabsTrigger value="account" className="gap-2"><Lock className="w-4 h-4" /> Security</TabsTrigger>
-          <TabsTrigger value="notifications" className="gap-2"><Bell className="w-4 h-4" /> Notifications</TabsTrigger>
-          <TabsTrigger value="billing" className="gap-2"><CreditCard className="w-4 h-4" /> Billing</TabsTrigger>
+        <TabsList className="flex flex-wrap h-auto gap-1 p-1">
+          <TabsTrigger value="profile" className="gap-1.5 flex-1 min-w-[80px]"><User className="w-4 h-4" /> Profile</TabsTrigger>
+          <TabsTrigger value="account" className="gap-1.5 flex-1 min-w-[80px]"><Lock className="w-4 h-4" /> Security</TabsTrigger>
+          <TabsTrigger value="notifications" className="gap-1.5 flex-1 min-w-[80px]">
+            <Bell className="w-4 h-4" />
+            <span className="hidden sm:inline">Notifications</span>
+            <span className="sm:hidden">Alerts</span>
+          </TabsTrigger>
+          <TabsTrigger value="billing" className="gap-1.5 flex-1 min-w-[80px]"><CreditCard className="w-4 h-4" /> Billing</TabsTrigger>
         </TabsList>
 
         {/* Profile Tab */}

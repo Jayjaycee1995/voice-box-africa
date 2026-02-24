@@ -5,15 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  MessageSquare, 
-  Search, 
-  Send, 
-  User, 
+import {
+  MessageSquare,
+  Search,
+  Send,
+  User,
   CheckCircle2,
   AlertTriangle,
   Filter,
-  Loader2
+  Loader2,
+  ArrowLeft
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -352,7 +353,7 @@ const MessagesView = () => {
   };
 
   return (
-    <div className="h-full space-y-6">
+    <div className="h-full space-y-4">
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold font-heading">Messages</h2>
@@ -360,9 +361,10 @@ const MessagesView = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-250px)] min-h-[500px]">
-        {/* Conversations List */}
-        <Card className="lg:col-span-1 flex flex-col border-none shadow-sm">
+      {/* Mobile: show either conversation list or message area */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 h-[calc(100vh-280px)] min-h-[500px]">
+        {/* Conversations List - hidden on mobile when a conversation is selected */}
+        <Card className={`lg:col-span-1 flex flex-col border-none shadow-sm ${selectedConversation ? 'hidden lg:flex' : 'flex'}`}>
           <CardHeader className="pb-3 border-b">
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg">Conversations</CardTitle>
@@ -386,6 +388,11 @@ const MessagesView = () => {
               {isLoadingConversations ? (
                 <div className="flex justify-center p-8">
                   <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                </div>
+              ) : filteredConversations.length === 0 ? (
+                <div className="p-8 text-center text-muted-foreground">
+                  <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                  <p className="text-sm">No conversations yet</p>
                 </div>
               ) : filteredConversations.map((conversation) => (
                 <div
@@ -432,23 +439,32 @@ const MessagesView = () => {
           </CardContent>
         </Card>
 
-        {/* Message Area */}
-        <Card className="lg:col-span-2 flex flex-col border-none shadow-sm">
+        {/* Message Area - hidden on mobile when no conversation is selected */}
+        <Card className={`lg:col-span-2 flex flex-col border-none shadow-sm ${!selectedConversation ? 'hidden lg:flex' : 'flex'}`}>
           <CardHeader className="pb-3 border-b">
             {selectedConversation ? (
               <div className="flex items-center gap-3">
-                <Avatar className="w-10 h-10">
+                {/* Back button - mobile only */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="lg:hidden -ml-1 flex-shrink-0"
+                  onClick={() => setSelectedConversation(null)}
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+                <Avatar className="w-10 h-10 flex-shrink-0">
                   <AvatarImage src={selectedConversation.avatar} />
                   <AvatarFallback>
                     <User className="w-5 h-5" />
                   </AvatarFallback>
                 </Avatar>
-                <div>
-                  <CardTitle className="text-lg">
+                <div className="min-w-0">
+                  <CardTitle className="text-lg truncate">
                     {selectedConversation.name}
                   </CardTitle>
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-green-500 rounded-full" />
+                    <span className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0" />
                     <p className="text-xs text-muted-foreground capitalize">
                       {selectedConversation.role}
                     </p>
@@ -471,13 +487,13 @@ const MessagesView = () => {
                       className={`flex ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
                     >
                       <div
-                        className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm ${
+                        className={`max-w-[75%] sm:max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm ${
                           message.sender_id === user?.id
                             ? 'bg-primary text-primary-foreground rounded-br-none'
                             : 'bg-card text-foreground border rounded-bl-none'
                         }`}
                       >
-                        <p className="text-sm leading-relaxed">{message.content}</p>
+                        <p className="text-sm leading-relaxed break-words">{message.content}</p>
                         <div className={`flex items-center gap-1 mt-1 text-[10px] ${
                           message.sender_id === user?.id ? 'text-primary-foreground/70' : 'text-muted-foreground'
                         }`}>
@@ -493,8 +509,8 @@ const MessagesView = () => {
                 </div>
 
                 {/* Message Input */}
-                <div className="p-4 bg-background border-t">
-                  <div className="flex gap-3">
+                <div className="p-3 sm:p-4 bg-background border-t">
+                  <div className="flex gap-2 sm:gap-3">
                     <Textarea
                       placeholder="Type your message..."
                       value={messageInput}
@@ -505,18 +521,18 @@ const MessagesView = () => {
                           handleSendMessage();
                         }
                       }}
-                      className="min-h-[50px] resize-none focus-visible:ring-primary"
+                      className="min-h-[44px] resize-none focus-visible:ring-primary"
                     />
-                    <Button 
+                    <Button
                       onClick={handleSendMessage}
                       disabled={!messageInput.trim()}
-                      className="self-end h-[50px] w-[50px] rounded-xl"
+                      className="self-end h-[44px] w-[44px] sm:h-[50px] sm:w-[50px] rounded-xl flex-shrink-0"
                     >
-                      <Send className="w-5 h-5" />
+                      <Send className="w-4 h-4 sm:w-5 sm:h-5" />
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3" />
+                    <AlertTriangle className="w-3 h-3 flex-shrink-0" />
                     Messages are protected by AI content filtering
                   </p>
                 </div>

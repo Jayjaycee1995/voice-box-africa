@@ -33,6 +33,7 @@ import ProjectsView from "@/components/dashboard/ProjectsView";
 import PaymentsView from "@/components/dashboard/PaymentsView";
 import SettingsView from "@/components/dashboard/SettingsView";
 import TalentProfileView from "@/components/dashboard/TalentProfileView";
+import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
 
 type TabType = "overview" | "jobs" | "messages" | "earnings" | "profile" | "settings";
 
@@ -212,7 +213,7 @@ const TalentDashboard = () => {
     <div className="min-h-screen bg-muted/30">
       <DashboardHeader />
       <div className="flex pt-16 min-h-screen">
-        {/* Sidebar Navigation */}
+        {/* Sidebar Navigation - Desktop only */}
         <aside className="hidden lg:flex flex-col w-64 fixed h-full bg-background border-r border-border pt-6 pb-4 px-4 z-10">
            <div className="space-y-1">
              {tabs.map((tab) => (
@@ -220,8 +221,8 @@ const TalentDashboard = () => {
                  key={tab.id}
                  onClick={() => setActiveTab(tab.id as TabType)}
                  className={`w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all ${
-                   activeTab === tab.id 
-                     ? "bg-primary text-primary-foreground shadow-md" 
+                   activeTab === tab.id
+                     ? "bg-primary text-primary-foreground shadow-md"
                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                  }`}
                >
@@ -230,7 +231,7 @@ const TalentDashboard = () => {
                    <span>{tab.label}</span>
                  </div>
                  {tab.badge && (
-                   <span className="w-5 h-5 rounded-full bg-yellow-500 text-white flex items-center justify-center text-xs font-bold shadow-sm">
+                   <span className="w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-xs font-bold shadow-sm">
                      {tab.badge}
                    </span>
                  )}
@@ -254,8 +255,15 @@ const TalentDashboard = () => {
            </div>
         </aside>
 
+        {/* Mobile Bottom Navigation */}
+        <MobileBottomNav
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={(id) => setActiveTab(id as TabType)}
+        />
+
         {/* Main Content */}
-        <main className="flex-1 lg:ml-64 p-4 md:p-8 overflow-y-auto">
+        <main className="flex-1 lg:ml-64 p-4 md:p-8 pb-24 lg:pb-8 overflow-y-auto">
           <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
             {activeTab === "overview" && (
               <>
