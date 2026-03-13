@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuthStore } from "@/store/useAuthStore";
 import { supabase } from "@/lib/supabase";
-import { Gig } from "@/lib/database.types";
+import { Gig, Proposal } from "@/lib/database.types";
 import {
   LayoutDashboard,
   MessageSquare,
@@ -21,7 +21,11 @@ import {
   Plus,
   MoreVertical,
   Bell,
-  LogOut
+  LogOut,
+  FileCheck2,
+  XCircle,
+  Check,
+  User
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import MessagesView from "@/components/dashboard/MessagesView";
@@ -30,8 +34,9 @@ import PaymentsView from "@/components/dashboard/PaymentsView";
 import SettingsView from "@/components/dashboard/SettingsView";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
 import { format, formatDistanceToNow } from "date-fns";
+import { toast } from "sonner";
 
-type TabType = "overview" | "projects" | "messages" | "payments" | "settings";
+type TabType = "overview" | "projects" | "proposals" | "messages" | "payments" | "settings";
 
 const statusConfig = {
   open: { label: "Open", color: "bg-blue-100 text-blue-700" },
@@ -46,6 +51,9 @@ const ClientDashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [recentProjects, setRecentProjects] = useState<Gig[]>([]);
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [proposalsLoading, setProposalsLoading] = useState(false);
+  const [proposalFilter, setProposalFilter] = useState<'all' | 'pending' | 'accepted' | 'rejected'>('all');
   const [chartData, setChartData] = useState<Array<{ name: string; spent: number }>>([]);
   const [recentMessages, setRecentMessages] = useState<
     Array<{ id: number; from: string; avatar: string; message: string; time: string; unread: boolean }>
@@ -179,9 +187,93 @@ const ClientDashboard = () => {
     fetchDashboardData();
   }, [user]);
 
+  // Fetch proposals when tab is active
+  useEffect(() => {
+    const fetchProposals = async () => {
+      if (!user || activeTab !== 'proposals') return;
+      
+      setProposalsLoading(true);
+      try {
+        // First get the client's gigs
+        const { data: gigs, error: gigsError } = await supabase
+          .from('gigs')
+          .select('id')
+          .eq('client_id', user.id);
+
+        if (gigsError) throw gigsError;
+        if (!gigs || gigs.length === 0) {
+          setProposals([]);
+          setProposalsLoading(false);
+          return;
+        }
+
+        const gigIds = gigs.map(g => g.id);
+
+        // Then get proposals for those gigs
+        const { data: proposalsData, error: proposalsError } = await supabase
+          .from('proposals')
+          .select(`
+            *,
+            gig:gigs(title, description, budget, deadline, status),
+            talent:users(name, email, profile_image, skills, bio)
+          `)
+          .in('gig_id', gigIds)
+          .order('created_at', { ascending: false });
+
+        if (proposalsError) throw proposalsError;
+        setProposals(proposalsData as unknown as Proposal[] || []);
+      } catch (error) {
+        console.error('Error fetching proposals:', error);
+      } finally {
+        setProposalsLoading(false);
+      }
+    };
+
+    fetchProposals();
+  }, [user, activeTab]);
+
+  const handleAcceptProposal = async (proposalId: number) => {
+    try {
+      const { error } = await supabase
+        .from('proposals')
+        .update({ status: 'accepted', updated_at: new Date().toISOString() })
+        .eq('id', proposalId);
+
+      if (error) throw error;
+
+      setProposals(prev => prev.map(p => 
+        p.id === proposalId ? { ...p, status: 'accepted' } : p
+      ));
+      toast.success('Proposal accepted! The talent has been notified.');
+    } catch (error) {
+      console.error('Error accepting proposal:', error);
+      toast.error('Failed to accept proposal. Please try again.');
+    }
+  };
+
+  const handleRejectProposal = async (proposalId: number) => {
+    try {
+      const { error } = await supabase
+        .from('proposals')
+        .update({ status: 'rejected', updated_at: new Date().toISOString() })
+        .eq('id', proposalId);
+
+      if (error) throw error;
+
+      setProposals(prev => prev.map(p => 
+        p.id === proposalId ? { ...p, status: 'rejected' } : p
+      ));
+      toast.success('Proposal rejected.');
+    } catch (error) {
+      console.error('Error rejecting proposal:', error);
+      toast.error('Failed to reject proposal. Please try again.');
+    }
+  };
+
   const tabs = [
     { id: "overview", label: "Overview", icon: LayoutDashboard },
     { id: "projects", label: "My Projects", icon: FileText },
+    { id: "proposals", label: "Proposals", icon: FileCheck2 },
     { id: "messages", label: "Messages", icon: MessageSquare, badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined },
     { id: "payments", label: "Payments", icon: DollarSign },
     { id: "settings", label: "Settings", icon: Settings },
@@ -189,10 +281,36 @@ const ClientDashboard = () => {
 
   const statsDisplay = [
     { label: "Active Projects", value: stats.activeProjects.toString(), icon: FileText, color: "text-blue-600", bg: "bg-blue-100" },
-    { label: "Total Spent", value: `$${stats.totalSpent.toFixed(2)}`, icon: DollarSign, color: "text-green-600", bg: "bg-green-100" },
+    { label: "Total Spent", value: `${stats.totalSpent.toFixed(2)}`, icon: DollarSign, color: "text-green-600", bg: "bg-green-100" },
     { label: "Completed", value: stats.completed.toString(), icon: CheckCircle2, color: "text-purple-600", bg: "bg-purple-100" },
     { label: "Avg. Rating", value: stats.avgRating == null ? "—" : stats.avgRating.toFixed(1), icon: Star, color: "text-yellow-600", bg: "bg-yellow-100" },
   ];
+
+  // Filtered proposals based on status
+  const filteredProposals = proposalFilter === 'all' 
+    ? proposals 
+    : proposals.filter(p => p.status === proposalFilter);
+
+  // Group proposals by gig
+  const groupedProposals = filteredProposals.reduce((acc, proposal) => {
+    const gigId = proposal.gig_id;
+    if (!acc[gigId]) {
+      acc[gigId] = {
+        gig: proposal.gig,
+        proposals: []
+      };
+    }
+    acc[gigId].proposals.push(proposal);
+    return acc;
+  }, {} as Record<number, { gig: Proposal['gig']; proposals: Proposal[] }>);
+
+  // Proposal stats
+  const proposalStats = {
+    total: proposals.length,
+    pending: proposals.filter(p => p.status === 'pending').length,
+    accepted: proposals.filter(p => p.status === 'accepted').length,
+    rejected: proposals.filter(p => p.status === 'rejected').length,
+  };
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -412,6 +530,213 @@ const ClientDashboard = () => {
             )}
             
             {activeTab === "projects" && <ProjectsView role="client" />}
+            
+            {activeTab === "proposals" && (
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <h1 className="text-3xl font-bold font-heading text-foreground">Proposals</h1>
+                    <p className="text-muted-foreground mt-1">Review and manage proposals from talents.</p>
+                  </div>
+                </div>
+
+                {/* Stats Cards */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <Card 
+                    className={`cursor-pointer border-none shadow-sm transition-all hover:shadow-md ${proposalFilter === 'all' ? 'ring-2 ring-primary' : ''}`}
+                    onClick={() => setProposalFilter('all')}
+                  >
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">All</p>
+                        <p className="text-2xl font-bold">{proposalStats.total}</p>
+                      </div>
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <FileCheck2 className="w-5 h-5 text-primary" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card 
+                    className={`cursor-pointer border-none shadow-sm transition-all hover:shadow-md ${proposalFilter === 'pending' ? 'ring-2 ring-yellow-500' : ''}`}
+                    onClick={() => setProposalFilter('pending')}
+                  >
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Pending</p>
+                        <p className="text-2xl font-bold text-yellow-600">{proposalStats.pending}</p>
+                      </div>
+                      <div className="p-2 rounded-lg bg-yellow-100">
+                        <Star className="w-5 h-5 text-yellow-600" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card 
+                    className={`cursor-pointer border-none shadow-sm transition-all hover:shadow-md ${proposalFilter === 'accepted' ? 'ring-2 ring-green-500' : ''}`}
+                    onClick={() => setProposalFilter('accepted')}
+                  >
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Accepted</p>
+                        <p className="text-2xl font-bold text-green-600">{proposalStats.accepted}</p>
+                      </div>
+                      <div className="p-2 rounded-lg bg-green-100">
+                        <CheckCircle2 className="w-5 h-5 text-green-600" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card 
+                    className={`cursor-pointer border-none shadow-sm transition-all hover:shadow-md ${proposalFilter === 'rejected' ? 'ring-2 ring-red-500' : ''}`}
+                    onClick={() => setProposalFilter('rejected')}
+                  >
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Rejected</p>
+                        <p className="text-2xl font-bold text-red-600">{proposalStats.rejected}</p>
+                      </div>
+                      <div className="p-2 rounded-lg bg-red-100">
+                        <XCircle className="w-5 h-5 text-red-600" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Content */}
+                {proposalsLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : filteredProposals.length === 0 ? (
+                  <Card className="border-none shadow-sm">
+                    <CardContent className="py-16 text-center">
+                      <div className="w-16 h-16 mx-auto rounded-full bg-muted flex items-center justify-center mb-4">
+                        <FileCheck2 className="w-8 h-8 text-muted-foreground" />
+                      </div>
+                      <h3 className="text-lg font-semibold mb-2">
+                        {proposalFilter === 'all' ? 'No Proposals Yet' : `No ${proposalFilter} Proposals`}
+                      </h3>
+                      <p className="text-muted-foreground max-w-md mx-auto">
+                        {proposalFilter === 'all' 
+                          ? "You haven't received any proposals yet. Post a gig to start receiving proposals from talented voice artists."
+                          : `You don't have any ${proposalFilter} proposals at the moment.`}
+                      </p>
+                      {proposalFilter !== 'all' && (
+                        <Button 
+                          variant="outline" 
+                          className="mt-4"
+                          onClick={() => setProposalFilter('all')}
+                        >
+                          View All Proposals
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-6">
+                    {Object.entries(groupedProposals).map(([gigId, { gig, proposals: gigProposals }]) => (
+                      <Card key={gigId} className="border-none shadow-sm overflow-hidden">
+                        {/* Gig Header */}
+                        <div className="bg-gradient-to-r from-primary/5 to-primary/10 px-6 py-4 border-b">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="font-semibold text-lg">{gig?.title || 'Unknown Gig'}</h3>
+                              <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                                <span className="flex items-center gap-1">
+                                  <DollarSign className="w-4 h-4" />
+                                  Budget: ${gig?.budget}
+                                </span>
+                                <span>•</span>
+                                <span>{gigProposals.length} proposal{gigProposals.length !== 1 ? 's' : ''}</span>
+                              </div>
+                            </div>
+                            <Badge className="bg-white/50 text-foreground border">
+                              {gig?.status}
+                            </Badge>
+                          </div>
+                        </div>
+                        
+                        {/* Proposals List */}
+                        <div className="divide-y">
+                          {gigProposals.map((proposal) => (
+                            <div key={proposal.id} className="p-4 hover:bg-muted/30 transition-colors">
+                              <div className="flex flex-col md:flex-row md:items-center gap-4">
+                                {/* Talent Avatar & Info */}
+                                <div className="flex items-center gap-3 md:w-56 flex-shrink-0">
+                                  <Avatar className="w-10 h-10">
+                                    <AvatarImage src={proposal.talent?.profile_image} />
+                                    <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                                      {proposal.talent?.name?.charAt(0) || 'U'}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="min-w-0">
+                                    <p className="font-medium text-sm truncate">{proposal.talent?.name || 'Unknown'}</p>
+                                    <p className="text-xs text-muted-foreground truncate">{proposal.talent?.email}</p>
+                                  </div>
+                                </div>
+
+                                {/* Bid & Time */}
+                                <div className="flex items-center gap-6 md:w-48 flex-shrink-0">
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">Bid</p>
+                                    <p className="font-semibold text-green-600">${proposal.bid_amount}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">Submitted</p>
+                                    <p className="text-sm">{formatDistanceToNow(new Date(proposal.created_at), { addSuffix: true })}</p>
+                                  </div>
+                                </div>
+
+                                {/* Status */}
+                                <div className="md:w-24 flex-shrink-0">
+                                  <Badge className={`
+                                    ${proposal.status === 'pending' ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-100' : ''}
+                                    ${proposal.status === 'accepted' ? 'bg-green-100 text-green-700 hover:bg-green-100' : ''}
+                                    ${proposal.status === 'rejected' ? 'bg-red-100 text-red-700 hover:bg-red-100' : ''}
+                                  `}>
+                                    {proposal.status}
+                                  </Badge>
+                                </div>
+
+                                {/* Cover Letter Preview */}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs text-muted-foreground mb-1">Cover Letter</p>
+                                  <p className="text-sm line-clamp-2 text-muted-foreground">
+                                    {proposal.cover_letter}
+                                  </p>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  {proposal.status === 'pending' && (
+                                    <>
+                                      <Button 
+                                        size="sm" 
+                                        className="bg-green-600 hover:bg-green-700"
+                                        onClick={() => handleAcceptProposal(proposal.id)}
+                                      >
+                                        <Check className="w-3 h-3 mr-1" /> Accept
+                                      </Button>
+                                      <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                                        onClick={() => handleRejectProposal(proposal.id)}
+                                      >
+                                        <XCircle className="w-3 h-3 mr-1" /> Reject
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             
             {activeTab === "messages" && <MessagesView />}
 

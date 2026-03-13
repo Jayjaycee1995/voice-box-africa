@@ -16,7 +16,7 @@ const Login = () => {
   const { toast } = useToast();
   const { login, logout } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
-  const [role, setRole] = useState<'client' | 'talent'>('client');
+  const [role, setRole] = useState<'client' | 'talent' | 'producer'>('client');
   const [formData, setFormData] = useState({
     email: localStorage.getItem('rememberedEmail') || "",
     password: "",
@@ -56,13 +56,13 @@ const Login = () => {
         description: "You have successfully logged in.",
       });
 
-      if (user?.role === "client" || user?.role === "talent") {
+      if (user?.role === 'client' || user?.role === 'talent' || user?.role === 'producer') {
         if (user.role !== role) {
           await logout();
           toast({
             variant: "destructive",
             title: "Wrong account type",
-            description: `This account is registered as a ${user.role}. Please switch to ${user.role} to sign in.`,
+            description: `This account is registered as a ${user.role}. Please switch to ${role} to sign in.`,
           });
           return;
         }
@@ -74,6 +74,8 @@ const Login = () => {
         navigate('/client-dashboard', { replace: true });
       } else if (user?.role === 'talent') {
         navigate('/talent-dashboard', { replace: true });
+      } else if (user?.role === 'producer') {
+        navigate('/producer-dashboard', { replace: true });
       } else {
         navigate('/admin', { replace: true });
       }
@@ -129,7 +131,7 @@ const Login = () => {
           </div>
 
           {/* Role Toggle */}
-          <div className="grid grid-cols-2 gap-4 p-1 bg-muted rounded-xl">
+          <div className="grid grid-cols-3 gap-2 p-1 bg-muted rounded-xl">
             <button
               type="button"
               onClick={() => setRole('client')}
@@ -153,6 +155,18 @@ const Login = () => {
             >
               Talent
               {role === 'talent' && <Check className="w-3 h-3 text-secondary" />}
+            </button>
+            <button
+              type="button"
+              onClick={() => setRole('producer')}
+              className={`flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ${
+                role === 'producer'
+                  ? 'bg-amber-500/10 text-amber-500 shadow-sm ring-1 ring-amber-500'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+            >
+              Producer
+              {role === 'producer' && <Check className="w-3 h-3 text-amber-500" />}
             </button>
           </div>
 

@@ -64,15 +64,25 @@ const ArtistCard = ({ artist }: ArtistCardProps) => {
               <h3 className="font-heading font-semibold text-foreground truncate group-hover:text-primary transition-colors">
                 {artist.name}
               </h3>
-              <span
-                className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                  artist.isAvailable
-                    ? "bg-primary/10 text-primary"
-                    : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {artist.isAvailable ? "Available" : "Busy"}
-              </span>
+              <div className="flex items-center gap-2">
+                {artist.isAvailable && (
+                  <div className="relative">
+                    <span className="flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                    </span>
+                  </div>
+                )}
+                <span
+                  className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                    artist.isAvailable
+                      ? "bg-primary/10 text-primary"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {artist.isAvailable ? "Available" : "Busy"}
+                </span>
+              </div>
             </div>
             <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
               <MapPin className="w-3 h-3" />

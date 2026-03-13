@@ -19,17 +19,18 @@ const Index = () => {
   const navigate = useNavigate();
   const [showScrollTop, setShowScrollTop] = useState(false);
 
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      if (user.role === 'client') {
-        navigate('/client-dashboard');
-      } else if (user.role === 'talent') {
-        navigate('/talent-dashboard');
-      } else {
-        navigate('/admin');
-      }
-    }
-  }, [isAuthenticated, user, navigate]);
+  // Temporarily disabled for debugging
+  // useEffect(() => {
+  //   if (isAuthenticated && user) {
+  //     if (user.role === 'client') {
+  //       navigate('/client-dashboard');
+  //     } else if (user.role === 'talent') {
+  //       navigate('/talent-dashboard');
+  //     } else {
+  //       navigate('/admin');
+  //     }
+  //   }
+  // }, [isAuthenticated, user, navigate]);
 
   useEffect(() => {
     const onScroll = () => {

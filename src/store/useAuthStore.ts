@@ -8,7 +8,7 @@ interface AuthState {
   isAuthenticated: boolean;
   initialize: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string, role: 'client' | 'talent', metadata?: Record<string, unknown>) => Promise<void>;
+  register: (email: string, password: string, name: string, role: 'client' | 'talent' | 'producer', metadata?: Record<string, unknown>) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (updates: Partial<User>) => Promise<void>;
 }

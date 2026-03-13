@@ -20,8 +20,8 @@
 10. [Dashboard Pages](#10-dashboard-pages)
 11. [Informational Pages](#11-informational-pages)
 12. [UI Component Library](#12-ui-component-library)
-13. [Backend Requirements (Not Yet Built)](#13-backend-requirements-not-yet-built)
-14. [Data Models (Mock)](#14-data-models-mock)
+13. [Backend Requirements](#13-backend-requirements)
+14. [Data Models](#14-data-models)
 
 ---
 
@@ -414,122 +414,154 @@ Accordion, Alert, AlertDialog, AspectRatio, Avatar, Badge, Breadcrumb, Button, C
 
 ---
 
-## 13. Backend Requirements (Not Yet Built)
+## 13. Backend Requirements
 
-The following backend infrastructure is needed to make this application functional:
+The Voice Box Africa application uses **Supabase** as its backend infrastructure. Supabase provides:
+
+- **PostgreSQL Database** — Full relational database with advanced features
+- **Authentication** — Email/password, OAuth (Google), and social login
+- **Real-time Subscriptions** — Live data updates for messages and notifications
+- **Edge Functions** — Deno-based serverless functions for custom logic
+- **Storage** — File storage for voice demos, profile images, and gig attachments
+- **Row Level Security (RLS)** — Fine-grained access control at the database level
 
 ### Authentication & Users
 - Email/password registration and login
-- Social OAuth (Google, GitHub)
-- Password reset via email
+- Social OAuth (Google)
 - User roles: `client`, `talent`, `admin`
-- Session management
+- Session management via Supabase Auth
+- Automatic profile creation on signup via database triggers
 
-### Database Tables Needed
-- `users` — id, email, password_hash, role, created_at
-- `profiles` — user_id, display_name, avatar_url, location, bio, languages[], specialties[], equipment, price_per_word, is_available
-- `demos` — id, artist_id, title, duration, audio_url
-- `projects` (bookings) — id, client_id, artist_id, name, status, script, instructions, usage_rights[], deadline, rush_delivery, word_count, base_price, total_price, created_at
-- `messages` — id, project_id, sender_id, content, read, created_at
-- `reviews` — id, project_id, client_id, artist_id, rating, content, created_at
-- `payments` — id, project_id, amount, status, payment_method, created_at
+### Database Tables (Implemented)
+- `users` — id, email, name, role, bio, skills, portfolio_url, profile_image, company_name, industry, location, price_per_word, equipment, is_available, created_at, updated_at
+- `gigs` — id, client_id, title, description, budget, deadline, category, accent, duration, word_count, status, language, tone, visibility, delivery_file, created_at, updated_at
+- `proposals` — id, gig_id, talent_id, cover_letter, bid_amount, status, demo_url, created_at, updated_at
+- `messages` — id, sender_id, receiver_id, content, is_read, created_at, updated_at
+- `invitations` — id, client_id, talent_id, gig_id, message, status, created_at, updated_at
+- `demos` — id, user_id, title, file_path, duration, type, created_at, updated_at
 
-### File Storage
-- Artist avatar uploads
-- Voice demo audio files (MP3/WAV)
-- Delivered voice-over files
+### File Storage (Implemented)
+- Voice demo audio files (demos bucket)
+- Profile images (profile-images bucket)
+- Gig attachments (gig-attachments bucket)
 
-### Payment Integration
-- Paystack (African cards, bank transfers, M-Pesa)
-- Flutterwave (alternative African payment)
-- Stripe (international payments)
-- Escrow system: Hold funds until client approves delivery
-
-### Real-time Features
-- Messaging between client and talent
-- Notification system (new bookings, messages, deliveries)
-- Project status updates
+### Real-time Features (Implemented)
+- Messaging between client and talent (via Supabase realtime)
+- Live data updates for gigs, proposals, and invitations
 
 ### Edge Functions / Server Logic
-- Word count → price calculation with artist's actual rate
-- Booking creation and status management
-- Payment webhook handlers
-- Email notifications (booking confirmation, delivery notification, password reset)
-- Review/rating aggregation
+- Custom user deletion with cascade cleanup
+- Advanced business logic processing
 
 ### Search & Discovery
-- Full-text search across artist names, bios, specialties
-- Filter by language, price range, availability, rating
+- PostgreSQL full-text search capabilities
+- Filter by language, price range, availability
 - Sort by rating, price, relevance
 
 ---
 
-## 14. Data Models (Mock)
+## 14. Data Models
 
-### Artist Object (used across Artists page, ArtistCard, FeaturedArtists)
+The following data models are implemented in the Supabase database. These are the actual database schemas used by the application.
+
+### User Object (public.users table)
 ```typescript
 {
-  id: string;
-  name: string;
-  avatar: string;          // Unsplash URL
-  location: string;        // "City, Country"
-  languages: string[];     // e.g. ["English (Nigerian)", "Yoruba"]
-  pricePerWord: number;    // e.g. 0.15
-  rating: number;          // e.g. 4.9
-  reviewCount: number;
-  isAvailable: boolean;
-  specialties: string[];   // e.g. ["Commercial", "Documentary"]
-  demoUrl: string;         // Placeholder path
+  id: string;              // UUID, references auth.users
+  email: string;           // Unique email address
+  name: string;            // User's display name
+  role: 'client' | 'talent' | 'admin';
+  bio: string;             // User biography
+  skills: string;          // JSON string or comma-separated skills
+  portfolio_url: string;   // Link to portfolio
+  profile_image: string;   // URL to profile image
+  company_name: string;    // For clients
+  industry: string;        // For clients
+  location: string;        // City, Country
+  price_per_word: number;  // For talent users
+  equipment: string;       // Recording equipment for talent
+  is_available: boolean;   // Availability status
+  created_at: timestamp;
+  updated_at: timestamp;
 }
 ```
 
-### Extended Artist Profile (ArtistProfile page)
+### Gig/Project Object (public.gigs table)
 ```typescript
 {
-  ...Artist,
-  coverImage: string;
-  flatRates: { words: number; price: number }[];
-  completedJobs: number;
-  responseTime: string;
-  memberSince: string;
-  bio: string;
-  equipment: string[];
-  demos: { id: string; title: string; duration: string }[];
-  reviews: {
-    id: string;
-    author: string;
-    avatar: string;
-    rating: number;
-    date: string;
-    content: string;
-    project: string;
-  }[];
+  id: bigint;              // Auto-incremented ID
+  client_id: string;      // UUID, references users.id
+  title: string;          // Project title
+  description: string;    // Project description
+  budget: number;         // Budget in dollars
+  deadline: date;         // Project deadline
+  category: string;       // e.g., Commercial, Documentary
+  accent: string;         // Required accent
+  duration: string;       // Expected duration
+  word_count: number;     // Estimated word count
+  status: 'open' | 'assigned' | 'completed' | 'cancelled';
+  language: string;       // Required language
+  tone: string;           // Required tone
+  visibility: 'public' | 'invite-only';
+  delivery_file: string;  // URL to delivered file
+  created_at: timestamp;
+  updated_at: timestamp;
 }
 ```
 
-### Project/Booking Object (Dashboard mock data)
+### Proposal Object (public.proposals table)
 ```typescript
 {
-  id: string;
-  name: string;
-  artist: string;         // or client (Talent dashboard)
-  artistAvatar: string;
-  status: "pending" | "in_progress" | "delivered" | "completed" | "cancelled" | "pending_review";
-  amount: number;
-  deadline: string;
-  wordCount?: number;
+  id: bigint;
+  gig_id: bigint;         // References gigs.id
+  talent_id: string;     // UUID, references users.id
+  cover_letter: string;  // Proposal message
+  bid_amount: number;    // Proposed price
+  status: 'pending' | 'accepted' | 'rejected';
+  demo_url: string;      // Link to demo audio
+  created_at: timestamp;
+  updated_at: timestamp;
 }
 ```
 
-### Message Object
+### Message Object (public.messages table)
 ```typescript
 {
-  id: string;
-  from: string;
-  avatar: string;
-  message: string;
-  time: string;
-  unread: boolean;
+  id: bigint;
+  sender_id: string;     // UUID, references users.id
+  receiver_id: string;   // UUID, references users.id
+  content: string;       // Message content
+  is_read: boolean;      // Read status
+  created_at: timestamp;
+  updated_at: timestamp;
+}
+```
+
+### Invitation Object (public.invitations table)
+```typescript
+{
+  id: bigint;
+  client_id: string;     // UUID, references users.id
+  talent_id: string;     // UUID, references users.id
+  gig_id: bigint;        // References gigs.id
+  message: string;       // Invitation message
+  status: 'pending' | 'accepted' | 'declined';
+  created_at: timestamp;
+  updated_at: timestamp;
+}
+```
+
+### Demo Object (public.demos table)
+```typescript
+{
+  id: bigint;
+  user_id: string;       // UUID, references users.id
+  title: string;         // Demo title
+  file_path: string;     // URL to audio file
+  duration: string;      // Duration in mm:ss
+  type: string;          // Demo type/category
+  created_at: timestamp;
+  updated_at: timestamp;
 }
 ```
 

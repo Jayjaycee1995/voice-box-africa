@@ -18,6 +18,9 @@ import DashboardHeader from "@/components/layout/DashboardHeader";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { africanLanguages } from "@/constants/languages";
 import { useAuthStore } from "@/store/useAuthStore";
+import { ServiceType, User } from "@/lib/database.types";
+import ServiceTypeSelector from "@/components/gig/ServiceTypeSelector";
+import ProducerSelector from "@/components/gig/ProducerSelector";
 
 const gigFormSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters"),
@@ -30,6 +33,8 @@ const gigFormSchema = z.object({
   visibility: z.enum(["public", "invite-only"]),
   usageRights: z.array(z.string()).optional(),
   scriptText: z.string().optional(),
+  serviceType: z.enum(["studio_only", "raw_recording", "produced_and_mixed", "producer_only"]),
+  productionNotes: z.string().optional(),
 });
 
 type GigFormValues = z.infer<typeof gigFormSchema>;
@@ -38,6 +43,8 @@ export default function GigPosting() {
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [isCustomLang, setIsCustomLang] = useState(false);
+  const [selectedServiceType, setSelectedServiceType] = useState<ServiceType>("studio_only");
+  const [selectedProducer, setSelectedProducer] = useState<User | undefined>();
   const { toast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
@@ -55,6 +62,8 @@ export default function GigPosting() {
       usageRights: [],
       budget: 0,
       deadline: undefined,
+      serviceType: "studio_only",
+      productionNotes: "",
     },
   });
 
@@ -96,10 +105,37 @@ export default function GigPosting() {
         visibility: data.visibility,
         category: "Voice Over",
         status: 'open',
+        service_type: data.serviceType,
+        production_notes: data.productionNotes,
+        requires_producer: data.serviceType === "produced_and_mixed" || data.serviceType === "producer_only",
+        assigned_producer_id: selectedProducer?.id || null,
       };
 
-      const { error } = await supabase.from('gigs').insert(payload);
+      const { data: gigData, error } = await supabase.from('gigs').insert(payload).select().single();
       if (error) throw error;
+
+      // If producer is selected, create a production assignment
+      if (selectedProducer && gigData) {
+        const assignmentType = data.serviceType === "produced_and_mixed" 
+          ? "full_production" 
+          : data.serviceType === "producer_only" 
+          ? "mixing" 
+          : "vocal_production";
+
+        const { error: assignmentError } = await supabase.from('production_assignments').insert({
+          gig_id: gigData.id,
+          producer_id: selectedProducer.id,
+          assignment_type: assignmentType,
+          status: 'pending',
+          rate_amount: selectedProducer.production_rate_per_hour ? 
+            selectedProducer.production_rate_per_hour * 8 * (selectedProducer.turnaround_time_days || 1) : 0,
+        });
+
+        if (assignmentError) {
+          console.error('Error creating production assignment:', assignmentError);
+          // Continue anyway, as gig was created successfully
+        }
+      }
       
       toast({
         title: "Success",
@@ -125,9 +161,11 @@ export default function GigPosting() {
     let fieldsToValidate: (keyof GigFormValues)[] = [];
     if (step === 1) fieldsToValidate = ['title', 'language', 'accent', 'tone'];
     if (step === 2) fieldsToValidate = ['description', 'scriptText'];
+    if (step === 3) fieldsToValidate = ['serviceType'];
+    if (step === 4) fieldsToValidate = ['budget', 'deadline', 'visibility'];
     
     const isValid = await form.trigger(fieldsToValidate);
-    if (isValid) setStep(step + 1);
+    if (isValid && step < 4) setStep(step + 1);
   };
 
   const prevStep = () => setStep(step - 1);
@@ -144,7 +182,7 @@ export default function GigPosting() {
              <div className="z-10 relative">
                <h2 className="text-2xl font-bold font-heading mb-6">Post a Job</h2>
                <div className="space-y-6">
-                 {[1, 2, 3].map((s) => (
+                 {[1, 2, 3, 4].map((s) => (
                    <div key={s} className={`flex items-center gap-3 transition-all duration-300 ${step === s ? "opacity-100 translate-x-2" : "opacity-60"}`}>
                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 ${step >= s ? "bg-primary border-primary text-white" : "border-white/30 text-white/50"}`}>
                        {step > s ? <CheckCircle2 className="w-5 h-5" /> : s}
@@ -152,7 +190,8 @@ export default function GigPosting() {
                      <span className="font-medium">
                        {s === 1 && "Project Basics"}
                        {s === 2 && "Details & Script"}
-                       {s === 3 && "Budget & Review"}
+                       {s === 3 && "Service Type"}
+                       {s === 4 && "Budget & Review"}
                      </span>
                    </div>
                  ))}
@@ -163,7 +202,7 @@ export default function GigPosting() {
              <div className="w-full h-2 bg-white/10 rounded-full mt-auto relative overflow-hidden">
                <div 
                  className="absolute top-0 left-0 h-full bg-gradient-to-r from-primary to-secondary transition-all duration-500 ease-out"
-                 style={{ width: `${(step / 3) * 100}%` }}
+                 style={{ width: `${(step / 4) * 100}%` }}
                />
              </div>
           </div>
@@ -174,7 +213,7 @@ export default function GigPosting() {
             <div className="md:hidden h-2 bg-muted w-full">
                <div 
                  className="h-full bg-primary transition-all duration-300"
-                 style={{ width: `${(step / 3) * 100}%` }}
+                 style={{ width: `${(step / 4) * 100}%` }}
                />
             </div>
 
@@ -275,6 +314,44 @@ export default function GigPosting() {
 
                 {step === 3 && (
                    <div className="space-y-4 animate-in slide-in-from-right-8 duration-300">
+                    <ServiceTypeSelector 
+                      selectedServiceType={selectedServiceType} 
+                      onSelect={(serviceType) => {
+                        setSelectedServiceType(serviceType);
+                        form.setValue("serviceType", serviceType);
+                      }} 
+                    />
+
+                    {(selectedServiceType === "produced_and_mixed" || selectedServiceType === "producer_only") && (
+                      <div className="space-y-4 mt-8 pt-8 border-t">
+                        <div>
+                          <h4 className="text-sm font-semibold mb-3">Select a Producer (Optional)</h4>
+                          <p className="text-xs text-muted-foreground mb-4">Choose a producer for {selectedServiceType === "produced_and_mixed" ? "full production" : "mixing/mastering"}.</p>
+                        </div>
+                        <ProducerSelector 
+                          assignmentType={selectedServiceType === "produced_and_mixed" ? "full_production" : "mixing"}
+                          serviceType={selectedServiceType}
+                          onSelect={setSelectedProducer}
+                          budget={form.watch("budget")}
+                        />
+                      </div>
+                    )}
+
+                    {selectedServiceType === "produced_and_mixed" && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Production Notes (Optional)</label>
+                        <Textarea 
+                          {...form.register("productionNotes")} 
+                          placeholder="Any special requirements for the producer? e.g., specific mix style, reference tracks, etc." 
+                          className="min-h-[100px]" 
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {step === 4 && (
+                   <div className="space-y-4 animate-in slide-in-from-right-8 duration-300">
                     <div>
                       <h3 className="text-xl font-semibold mb-1">Budget & Timeline</h3>
                       <p className="text-sm text-muted-foreground">Finalize your job post.</p>
@@ -333,7 +410,7 @@ export default function GigPosting() {
                  <Button variant="ghost" onClick={() => navigate(-1)} disabled={isLoading}>Cancel</Button>
                )}
                
-               {step < 3 ? (
+               {step < 4 ? (
                  <Button className="btn-gradient" onClick={nextStep}>Next <ArrowRight className="w-4 h-4 ml-2" /></Button>
                ) : (
                  <Button className="btn-gradient" onClick={form.handleSubmit(onSubmit)} disabled={isLoading}>

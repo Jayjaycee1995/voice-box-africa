@@ -16,6 +16,13 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Gig } from "@/lib/database.types";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Proposal {
   id: number;
@@ -37,6 +44,7 @@ interface TalentGig extends Gig {
 
 const ProjectsView = ({ role }: { role: 'client' | 'talent' }) => {
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [projects, setProjects] = useState<TalentGig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuthStore();
@@ -148,9 +156,22 @@ const ProjectsView = ({ role }: { role: 'client' | 'talent' }) => {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Button variant="outline" className="gap-2">
-          <Filter className="w-4 h-4" /> Filter
-        </Button>
+        <Select
+          value={statusFilter}
+          onValueChange={(value) => setStatusFilter(value)}
+        >
+          <SelectTrigger className="w-[180px]">
+            <Filter className="w-4 h-4 mr-2" />
+            <SelectValue placeholder="Filter by status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="open">Open</SelectItem>
+            <SelectItem value="assigned">Assigned</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="cancelled">Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="grid gap-4">
@@ -166,7 +187,11 @@ const ProjectsView = ({ role }: { role: 'client' | 'talent' }) => {
           </Card>
         ) : (
           projects
-            .filter(p => p.title.toLowerCase().includes(search.toLowerCase()))
+            .filter(p => {
+              const matchesSearch = p.title.toLowerCase().includes(search.toLowerCase());
+              const matchesStatus = statusFilter === "all" || (p.status?.toLowerCase() || '') === statusFilter.toLowerCase();
+              return matchesSearch && matchesStatus;
+            })
             .map((project) => (
               <Card key={project.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-6">

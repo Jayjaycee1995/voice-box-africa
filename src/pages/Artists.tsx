@@ -7,6 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, SlidersHorizontal, X, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface Artist {
   id: string | number;
@@ -202,36 +210,42 @@ const Artists = () => {
 
               {/* Desktop Filters */}
               <div className="hidden md:flex gap-3">
-                <select
+                <Select
                   value={selectedLanguage}
-                  onChange={(e) => setSelectedLanguage(e.target.value)}
-                  className="h-12 px-4 bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary/20 text-foreground"
+                  onValueChange={(value) => setSelectedLanguage(value)}
                 >
-                  {languages.map((lang) => (
-                    <option key={lang} value={lang}>
-                      {lang}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="h-12 w-[180px] bg-background border-input">
+                    <SelectValue placeholder="Language" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {languages.map((lang) => (
+                      <SelectItem key={lang} value={lang}>
+                        {lang}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-                <select
-                  value={selectedPriceRange}
-                  onChange={(e) => setSelectedPriceRange(Number(e.target.value))}
-                  className="h-12 px-4 bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary/20 text-foreground"
+                <Select
+                  value={selectedPriceRange.toString()}
+                  onValueChange={(value) => setSelectedPriceRange(Number(value))}
                 >
-                  {priceRanges.map((range, index) => (
-                    <option key={range.label} value={index}>
-                      {range.label}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="h-12 w-[180px] bg-background border-input">
+                    <SelectValue placeholder="Price Range" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {priceRanges.map((range, index) => (
+                      <SelectItem key={range.label} value={index.toString()}>
+                        {range.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
                 <label className="flex items-center gap-2 px-4 h-12 border border-input rounded-lg cursor-pointer hover:bg-muted/50">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={showAvailableOnly}
-                    onChange={(e) => setShowAvailableOnly(e.target.checked)}
-                    className="rounded"
+                    onCheckedChange={(checked) => setShowAvailableOnly(typeof checked === 'boolean' ? checked : false)}
                   />
                   <span className="text-sm">Available only</span>
                 </label>
@@ -245,42 +259,48 @@ const Artists = () => {
                   <label className="text-sm font-medium text-foreground mb-2 block">
                     Language
                   </label>
-                  <select
+                  <Select
                     value={selectedLanguage}
-                    onChange={(e) => setSelectedLanguage(e.target.value)}
-                    className="w-full h-10 px-3 bg-background border border-input rounded-lg text-foreground"
+                    onValueChange={(value) => setSelectedLanguage(value)}
                   >
-                    {languages.map((lang) => (
-                      <option key={lang} value={lang}>
-                        {lang}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full h-10 bg-background border-input">
+                      <SelectValue placeholder="Select language" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {languages.map((lang) => (
+                        <SelectItem key={lang} value={lang}>
+                          {lang}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="text-sm font-medium text-foreground mb-2 block">
                     Price Range
                   </label>
-                  <select
-                    value={selectedPriceRange}
-                    onChange={(e) => setSelectedPriceRange(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-background border border-input rounded-lg text-foreground"
+                  <Select
+                    value={selectedPriceRange.toString()}
+                    onValueChange={(value) => setSelectedPriceRange(Number(value))}
                   >
-                    {priceRanges.map((range, index) => (
-                      <option key={range.label} value={index}>
-                        {range.label}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full h-10 bg-background border-input">
+                      <SelectValue placeholder="Select price range" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {priceRanges.map((range, index) => (
+                        <SelectItem key={range.label} value={index.toString()}>
+                          {range.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={showAvailableOnly}
-                    onChange={(e) => setShowAvailableOnly(e.target.checked)}
-                    className="rounded"
+                    onCheckedChange={(checked) => setShowAvailableOnly(typeof checked === 'boolean' ? checked : false)}
                   />
                   <span className="text-sm">Show available only</span>
                 </label>

@@ -9,6 +9,15 @@ import { Gig } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useToast } from "@/hooks/use-toast";
+import { timeAgo } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const languages = [
   "All Languages",
@@ -203,48 +212,58 @@ const BrowseGigs = () => {
 
               {/* Desktop Filters */}
               <div className="hidden md:flex gap-3">
-                <select
+                <Select
                   value={selectedLanguage}
-                  onChange={(e) => setSelectedLanguage(e.target.value)}
-                  className="h-12 px-4 bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary/20 text-foreground"
+                  onValueChange={(value) => setSelectedLanguage(value)}
                 >
-                  {languages.map((lang) => (
-                    <option key={lang} value={lang}>
-                      {lang}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="h-12 w-[180px] bg-background border-input">
+                    <SelectValue placeholder="Language" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {languages.map((lang) => (
+                      <SelectItem key={lang} value={lang}>
+                        {lang}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-                <select
+                <Select
                   value={selectedTone}
-                  onChange={(e) => setSelectedTone(e.target.value)}
-                  className="h-12 px-4 bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary/20 text-foreground"
+                  onValueChange={(value) => setSelectedTone(value)}
                 >
-                  {tones.map((tone) => (
-                    <option key={tone} value={tone}>
-                      {tone}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="h-12 w-[180px] bg-background border-input">
+                    <SelectValue placeholder="Tone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tones.map((tone) => (
+                      <SelectItem key={tone} value={tone}>
+                        {tone}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-                <select
-                  value={selectedBudgetRange}
-                  onChange={(e) => setSelectedBudgetRange(Number(e.target.value))}
-                  className="h-12 px-4 bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary/20 text-foreground"
+                <Select
+                  value={selectedBudgetRange.toString()}
+                  onValueChange={(value) => setSelectedBudgetRange(Number(value))}
                 >
-                  {budgetRanges.map((range, index) => (
-                    <option key={range.label} value={index}>
-                      {range.label}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="h-12 w-[180px] bg-background border-input">
+                    <SelectValue placeholder="Budget" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {budgetRanges.map((range, index) => (
+                      <SelectItem key={range.label} value={index.toString()}>
+                        {range.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
                 <label className="flex items-center gap-2 px-4 h-12 border border-input rounded-lg cursor-pointer hover:bg-muted/50">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={showPublicOnly}
-                    onChange={(e) => setShowPublicOnly(e.target.checked)}
-                    className="rounded"
+                    onCheckedChange={(checked) => setShowPublicOnly(typeof checked === 'boolean' ? checked : false)}
                   />
                   <span className="text-sm">Public only</span>
                 </label>
@@ -254,48 +273,58 @@ const BrowseGigs = () => {
             {/* Mobile Filters */}
             {showFilters && (
               <div className="md:hidden mt-4 p-4 bg-muted/50 rounded-lg space-y-4">
-                <select
+                <Select
                   value={selectedLanguage}
-                  onChange={(e) => setSelectedLanguage(e.target.value)}
-                  className="w-full h-12 px-4 bg-background border border-input rounded-lg"
+                  onValueChange={(value) => setSelectedLanguage(value)}
                 >
-                  {languages.map((lang) => (
-                    <option key={lang} value={lang}>
-                      {lang}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full h-12 bg-background border-input">
+                    <SelectValue placeholder="Select language" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {languages.map((lang) => (
+                      <SelectItem key={lang} value={lang}>
+                        {lang}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-                <select
+                <Select
                   value={selectedTone}
-                  onChange={(e) => setSelectedTone(e.target.value)}
-                  className="w-full h-12 px-4 bg-background border border-input rounded-lg"
+                  onValueChange={(value) => setSelectedTone(value)}
                 >
-                  {tones.map((tone) => (
-                    <option key={tone} value={tone}>
-                      {tone}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full h-12 bg-background border-input">
+                    <SelectValue placeholder="Select tone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tones.map((tone) => (
+                      <SelectItem key={tone} value={tone}>
+                        {tone}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-                <select
-                  value={selectedBudgetRange}
-                  onChange={(e) => setSelectedBudgetRange(Number(e.target.value))}
-                  className="w-full h-12 px-4 bg-background border border-input rounded-lg"
+                <Select
+                  value={selectedBudgetRange.toString()}
+                  onValueChange={(value) => setSelectedBudgetRange(Number(value))}
                 >
-                  {budgetRanges.map((range, index) => (
-                    <option key={range.label} value={index}>
-                      {range.label}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full h-12 bg-background border-input">
+                    <SelectValue placeholder="Select budget" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {budgetRanges.map((range, index) => (
+                      <SelectItem key={range.label} value={index.toString()}>
+                        {range.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
                 <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={showPublicOnly}
-                    onChange={(e) => setShowPublicOnly(e.target.checked)}
-                    className="rounded"
+                    onCheckedChange={(checked) => setShowPublicOnly(typeof checked === 'boolean' ? checked : false)}
                   />
                   <span className="text-sm">Public gigs only</span>
                 </label>
@@ -304,7 +333,7 @@ const BrowseGigs = () => {
           </div>
 
           {/* Gig List */}
-          <div className="grid gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {isLoading ? (
               <div className="flex justify-center items-center py-20">
                 <Loader2 className="w-10 h-10 animate-spin text-primary" />
@@ -314,40 +343,40 @@ const BrowseGigs = () => {
                 {filteredGigs.map((gig, index) => (
                   <div
                     key={gig.id}
-                    className="card-elevated p-6 rounded-xl animate-slide-up"
+                    className="card-elevated p-4 md:p-6 rounded-xl animate-slide-up overflow-hidden"
                     style={{ animationDelay: `${index * 0.04}s` }}
                   >
-                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                      <div className="flex-1">
+                    <div className="flex flex-col gap-4">
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-semibold text-xl text-foreground">
+                          <h3 className="font-semibold text-lg md:text-xl text-foreground truncate">
                             {gig.title}
                           </h3>
                           {gig.visibility === "invite-only" && (
-                            <span className="flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded-full">
+                            <span className="flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded-full shrink-0">
                               <EyeOff className="w-3 h-3" />
                               Invite Only
                             </span>
                           )}
                         </div>
                         
-                        <p className="text-muted-foreground mb-4 line-clamp-3">
+                        <p className="text-muted-foreground mb-4 line-clamp-2 text-sm md:text-base">
                           {gig.description}
                         </p>
 
-                        <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-4">
-                          <span className="bg-primary/10 text-primary px-3 py-1 rounded-full">
+                        <div className="flex flex-wrap gap-2 text-sm text-muted-foreground mb-3">
+                          <span className="bg-primary/10 text-primary px-2 py-1 rounded-full text-xs md:text-sm truncate">
                             {gig.language}
                           </span>
-                          <span className="bg-secondary/10 text-secondary px-3 py-1 rounded-full">
+                          <span className="bg-secondary/10 text-secondary px-2 py-1 rounded-full text-xs md:text-sm truncate">
                             {gig.accent} accent
                           </span>
-                          <span className="bg-accent/10 text-accent px-3 py-1 rounded-full">
+                          <span className="bg-accent/10 text-accent px-2 py-1 rounded-full text-xs md:text-sm truncate">
                             {gig.tone} tone
                           </span>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-4 text-sm">
+                        <div className="flex flex-wrap items-center gap-2 md:gap-4 text-sm">
                           {gig.budget && (
                             <span className="font-semibold text-foreground">
                               ${gig.budget}
@@ -357,13 +386,16 @@ const BrowseGigs = () => {
                             <Clock className="w-4 h-4" />
                             {formatDeadline(gig.deadline)}
                           </span>
+                          <span className="text-xs text-muted-foreground">
+                            Posted {timeAgo(gig.created_at)}
+                          </span>
                         </div>
                       </div>
 
-                      <div className="flex flex-col gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2 shrink-0">
                         {(!isAuthenticated || user?.role === 'talent') && (
                           <Button 
-                            className="btn-gradient" 
+                            className="btn-gradient text-sm" 
                             asChild
                           >
                             <Link to={`/submit-proposal/${gig.id}`}>
@@ -371,7 +403,7 @@ const BrowseGigs = () => {
                             </Link>
                           </Button>
                         )}
-                        <Button variant="outline" asChild>
+                        <Button variant="outline" size="sm" asChild>
                           <Link to={`/gig/${gig.id}`}>
                             View Details
                           </Link>

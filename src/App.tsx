@@ -16,8 +16,11 @@ import HowItWorks from "./pages/HowItWorks";
 import Pricing from "./pages/Pricing";
 import ClientDashboard from "./pages/ClientDashboard";
 import TalentDashboard from "./pages/TalentDashboard";
+import ProducerDashboard from "./pages/ProducerDashboard";
+// import ProducerDiscovery from "./pages/ProducerDiscovery";
 import GigPosting from "./pages/GigPosting";
 import BrowseGigs from "./pages/BrowseGigs";
+import GigDetails from "./pages/GigDetails";
 import SubmitProposal from "./pages/SubmitProposal";
 import Invitations from "./pages/Invitations";
 import Messages from "./pages/Messages";
@@ -33,7 +36,7 @@ const queryClient = new QueryClient();
 import { useEffect } from 'react';
 import { useAuthStore } from './store/useAuthStore';
 
-type Role = "client" | "talent" | "admin";
+type Role = "client" | "talent" | "admin" | "producer";
 
 const RequireAuth = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, user, loading } = useAuthStore();
@@ -78,6 +81,7 @@ const DashboardRedirect = () => {
   if (!isAuthenticated || !user) return <Navigate to="/login" replace />;
   if (user.role === "client") return <Navigate to="/client-dashboard" replace />;
   if (user.role === "talent") return <Navigate to="/talent-dashboard" replace />;
+  if (user.role === "producer") return <Navigate to="/producer-dashboard" replace />;
   return <Navigate to="/admin" replace />;
 };
 
@@ -141,6 +145,20 @@ const AnimatedRoutes = () => {
           }
         />
         <Route
+          path="/producer-dashboard"
+          element={
+            <RequireRole roles={["producer"]}>
+              <ProducerDashboard />
+            </RequireRole>
+          }
+        />
+        {/* <Route
+          path="/producers"
+          element={
+            <ProducerDiscovery />
+          }
+        /> */}
+        <Route
           path="/post-gig"
           element={
             <RequireRole roles={["client"]}>
@@ -151,8 +169,14 @@ const AnimatedRoutes = () => {
         <Route
           path="/browse-gigs"
           element={
+            <BrowseGigs />
+          }
+        />
+        <Route
+          path="/gig/:id"
+          element={
             <RequireRole roles={["talent"]}>
-              <BrowseGigs />
+              <GigDetails />
             </RequireRole>
           }
         />

@@ -28,7 +28,7 @@ import voiboxLogo from "@/assets/voibox-logo.png";
 import { africanLanguages } from "@/constants/languages";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-type UserType = "client" | "talent";
+type UserType = "client" | "talent" | "producer";
 
 const specialties = [
   "Commercial", "Documentary", "E-learning", "Corporate",
@@ -184,10 +184,13 @@ const Register = () => {
             <div className="text-center space-y-2">
               <h2 className="text-2xl font-bold font-heading">Create an account</h2>
               <p className="text-muted-foreground">Choose your account type to get started</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Already have an account? <Link to="/login" state={{ from: (location.state as { from?: unknown } | null)?.from ?? null, role: userType }} className="text-primary font-medium hover:underline">Sign in</Link>
+              </p>
             </div>
 
             {/* User Type Toggle */}
-            <div className="grid grid-cols-2 gap-4 p-1 bg-muted rounded-xl">
+            <div className="grid grid-cols-3 gap-2 p-1 bg-muted rounded-xl">
               <button
                 onClick={() => { setUserType("client"); setStep(1); }}
                 className={`flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
@@ -197,7 +200,7 @@ const Register = () => {
                 }`}
               >
                 <Briefcase className="w-4 h-4" />
-                I'm a Client
+                Client
               </button>
               <button
                 onClick={() => { setUserType("talent"); setStep(1); }}
@@ -208,7 +211,18 @@ const Register = () => {
                 }`}
               >
                 <Mic2 className="w-4 h-4" />
-                I'm a Talent
+                Talent
+              </button>
+              <button
+                onClick={() => { setUserType("producer"); setStep(1); }}
+                className={`flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  userType === "producer" 
+                    ? "bg-amber-500/10 text-amber-500 shadow-sm ring-1 ring-amber-500" 
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                }`}
+              >
+                <Building2 className="w-4 h-4" />
+                Producer
               </button>
             </div>
 
@@ -385,6 +399,42 @@ const Register = () => {
                         Complete
                       </Button>
                     </div>
+                  </div>
+                )}
+
+                {/* Producer Form */}
+                {userType === "producer" && (
+                  <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Studio Name</Label>
+                        <Input placeholder="VoiceBox Africa Studio" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Contact Email</Label>
+                        <Input type="email" placeholder="studio@example.com" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Studio Bio</Label>
+                      <Textarea placeholder="Describe your studio, services, and experience..." value={formData.bio} onChange={e => setFormData({...formData, bio: e.target.value})} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Password</Label>
+                      <PasswordInput placeholder="Create a password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center">
+                        <Checkbox id="terms" checked={formData.agreeToTerms} onCheckedChanged={(checked) => setFormData({...formData, agreeToTerms: checked as boolean})} />
+                        <label htmlFor="terms" className="text-sm text-muted-foreground ml-2">
+                          I agree to the <Link to="/terms" className="text-primary hover:underline">Terms of Service</Link> and <Link to="/privacy" className="text-primary hover:underline">Privacy Policy</Link>
+                        </label>
+                      </div>
+                    </div>
+                    <Button className="w-full bg-amber-500 hover:bg-amber-600 mt-2" size="lg" onClick={handleSubmit} disabled={isLoading || !formData.agreeToTerms}>
+                      {isLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                      Create Producer Account
+                    </Button>
                   </div>
                 )}
 

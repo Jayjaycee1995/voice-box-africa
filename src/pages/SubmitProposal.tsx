@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation, useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,19 +9,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Upload, Clock, Loader2 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft, Loader2, Clock, DollarSign, Calendar } from "lucide-react";
 import { Gig } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useToast } from "@/hooks/use-toast";
-
-// Mock gig data removed
+import { timeAgo } from "@/lib/utils";
 
 const proposalFormSchema = z.object({
-  bidPrice: z.number().min(1, "Bid price must be at least $1").max(100000, "Bid price cannot exceed $100,000"),
-  deliveryTime: z.number().min(1, "Delivery time must be at least 1 day").max(365, "Delivery time cannot exceed 1 year"),
-  proposalText: z.string().min(50, "Proposal must be at least 50 characters").max(2000, "Proposal cannot exceed 2000 characters"),
-  demoFile: z.instanceof(FileList).optional()
+  bidPrice: z.number().min(1, "Bid price is required").max(100000, "Max $100,000"),
+  deliveryTime: z.number().min(1, "Delivery time is required").max(365, "Max 365 days"),
+  proposalText: z.string().min(50, "Min 50 characters").max(2000, "Max 2000 characters"),
 });
 
 type ProposalFormValues = z.infer<typeof proposalFormSchema>;
@@ -31,388 +30,265 @@ const SubmitProposal = () => {
   const [gig, setGig] = useState<Gig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const { toast } = useToast();
-  const location = useLocation();
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     watch,
-    setValue
+    setValue,
   } = useForm<ProposalFormValues>({
     resolver: zodResolver(proposalFormSchema),
-    defaultValues: {
-      bidPrice: 0,
-      deliveryTime: 7,
-      proposalText: ""
-    }
+    defaultValues: { bidPrice: 0, deliveryTime: 7, proposalText: "" }
   });
 
   useEffect(() => {
     if (!isAuthenticated) {
-      toast({
-        title: "Authentication required",
-        description: "Please log in to submit a proposal.",
-      });
-      navigate("/login", { state: { from: `${location.pathname}${location.search}`, role: "talent" } });
+      navigate("/login", { state: { from: `/submit-proposal/${gigId}`, role: "talent" } });
       return;
     }
-
     if (user?.role !== 'talent') {
-      toast({
-        title: "Access denied",
-        description: "Only talents can submit proposals.",
-        variant: "destructive"
-      });
+      toast({ title: "Access denied", description: "Only talents can submit proposals", variant: "destructive" });
       navigate("/client-dashboard");
       return;
     }
 
     const fetchGig = async () => {
       try {
-        const { data, error } = await supabase
-          .from('gigs')
-          .select('*')
-          .eq('id', gigId)
-          .single();
-
+        const { data, error } = await supabase.from('gigs').select('*').eq('id', gigId).single();
         if (error) throw error;
-
-        const gigData = data as unknown as Gig;
-        setGig(gigData);
-        if (gigData.budget) {
-          setValue("bidPrice", gigData.budget * 0.9);
-        }
+        setGig(data);
+        if (data?.budget) setValue("bidPrice", data.budget * 0.9);
       } catch (error) {
-        console.error("Failed to fetch gig", error);
-        toast({ title: "Error", description: "Failed to load gig details", variant: "destructive" });
+        toast({ title: "Error", description: "Failed to load gig", variant: "destructive" });
+        navigate('/browse-gigs');
       } finally {
         setIsLoading(false);
       }
     };
     if (gigId) fetchGig();
-  }, [gigId, location.pathname, location.search, setValue, toast, isAuthenticated, navigate, user?.role]);
+  }, [gigId, user?.role, isAuthenticated, navigate, toast, setValue]);
 
   const bidPrice = watch("bidPrice");
   const deliveryTime = watch("deliveryTime");
+  const proposalText = watch("proposalText");
 
-  const calculatePlatformFee = (price: number) => price * 0.10; // 10% platform fee
-  const calculateTotal = (price: number) => price + calculatePlatformFee(price);
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      // Validate file type and size
-      const validTypes = ['audio/mpeg', 'audio/wav', 'audio/mp3', 'audio/x-m4a'];
-      const maxSize = 10 * 1024 * 1024; // 10MB
-      
-      if (!validTypes.includes(file.type)) {
-        alert('Please upload an audio file (MP3, WAV, M4A)');
-        return;
-      }
-      
-      if (file.size > maxSize) {
-        alert('File size must be less than 10MB');
-        return;
-      }
-      
-      setSelectedFile(file);
-    }
-  };
-
-  const uploadDemo = async (file: File) => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Math.random()}.${fileExt}`;
-    const filePath = `${user?.id}/${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('demos')
-      .upload(filePath, file);
-
-    if (uploadError) {
-      throw uploadError;
-    }
-
-    const { data } = supabase.storage
-      .from('demos')
-      .getPublicUrl(filePath);
-
-    return data.publicUrl;
-  };
+  const platformFee = bidPrice * 0.10;
+  const youReceive = bidPrice - platformFee;
 
   const onSubmit = async (data: ProposalFormValues) => {
+    if (!user || !gigId) return;
     setIsSubmitting(true);
-    
-    if (!user) {
-      toast({
-        title: "Error",
-        description: "You must be logged in to submit a proposal.",
-        variant: "destructive",
-      });
-      setIsSubmitting(false);
-      return;
-    }
-
     try {
-      let demoUrl = null;
-      if (selectedFile) {
-        demoUrl = await uploadDemo(selectedFile);
-      }
-
-      const { error } = await supabase
-        .from('proposals')
-        .insert({
-          gig_id: Number(gigId),
-          talent_id: user.id,
-          bid_amount: data.bidPrice,
-          cover_letter: `${data.proposalText}\n\nDelivery Time: ${data.deliveryTime} days`,
-          status: 'pending',
-          demo_url: demoUrl
-        });
-
-      if (error) throw error;
-      
-      toast({
-        title: "Success",
-        description: "Proposal submitted successfully!",
+      const { error } = await supabase.from('proposals').insert({
+        gig_id: Number(gigId),
+        talent_id: user.id,
+        bid_amount: data.bidPrice,
+        cover_letter: `${data.proposalText}\n\nDelivery: ${data.deliveryTime} days`,
+        status: 'pending'
       });
       
-      navigate('/browse-gigs');
+      if (error) {
+        console.error("Submit error:", error);
+        throw error;
+      }
       
-    } catch (error) {
-      console.error('Error submitting proposal:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to submit proposal. Please try again.';
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
+      toast({ title: "Success!", description: "Your proposal has been submitted." });
+      navigate('/browse-gigs');
+    } catch (error: any) {
+      console.error("Submit error:", error);
+      toast({ 
+        title: "Error", 
+        description: error?.message || "Failed to submit proposal. Please try again.", 
+        variant: "destructive" 
       });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  const formatDate = (date: string) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-  if (!gig) {
+  if (isLoading || !gig) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="text-xl">Gig not found</div>
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+        <Footer />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen flex flex-col">
       <Header />
-      <main className="pt-20 md:pt-24 pb-12">
-        <div className="container mx-auto px-4 max-w-4xl">
-          {/* Back Navigation */}
+      
+      <main className="flex-1 py-8">
+        <div className="container mx-auto px-4 max-w-5xl">
+          {/* Back Button */}
           <div className="mb-6">
-            <Button variant="ghost" asChild className="gap-2">
-              <Link to={`/browse-gigs`}>
+            <Button variant="ghost" asChild>
+              <Link to="/browse-gigs" className="gap-2">
                 <ArrowLeft className="w-4 h-4" />
-                Back to Gigs
+                Back to Browse Gigs
               </Link>
             </Button>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8">
-            {/* Gig Details */}
-            <div className="card-elevated p-6 rounded-xl">
-              <h2 className="font-semibold text-xl text-foreground mb-4">
-                Gig Details
-              </h2>
-              
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-semibold text-lg text-foreground mb-2">
-                    {gig.title}
-                  </h3>
-                  <p className="text-muted-foreground">
-                    {gig.description}
-                  </p>
-                </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Main Form - 2/3 */}
+            <div className="lg:col-span-2 space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Submit Proposal</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+                    {/* Bid Amount */}
+                    <div className="space-y-2">
+                      <Label htmlFor="bidPrice">Your Bid Amount ($)</Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                        <Input 
+                          id="bidPrice"
+                          type="number" 
+                          step="0.01" 
+                          {...register("bidPrice", { valueAsNumber: true })} 
+                          className={`pl-8 ${errors.bidPrice ? "border-destructive" : ""}`}
+                          placeholder="0.00"
+                        />
+                      </div>
+                      {errors.bidPrice && <p className="text-sm text-destructive">{errors.bidPrice.message}</p>}
+                    </div>
 
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Language:</span>
-                    <div className="font-medium text-foreground">
-                      {gig.language}
+                    {/* Delivery Time */}
+                    <div className="space-y-2">
+                      <Label htmlFor="deliveryTime">Delivery Time (Days)</Label>
+                      <div className="relative">
+                        <Input 
+                          id="deliveryTime"
+                          type="number" 
+                          {...register("deliveryTime", { valueAsNumber: true })} 
+                          className={errors.deliveryTime ? "border-destructive" : ""}
+                          placeholder="7"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">days</span>
+                      </div>
+                      {errors.deliveryTime && <p className="text-sm text-destructive">{errors.deliveryTime.message}</p>}
                     </div>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Accent:</span>
-                    <div className="font-medium text-foreground">
-                      {gig.accent}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Tone:</span>
-                    <div className="font-medium text-foreground">
-                      {gig.tone}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Budget:</span>
-                    <div className="font-medium text-foreground">
-                      {gig.budget ? `$${gig.budget}` : 'Not specified'}
-                    </div>
-                  </div>
-                </div>
 
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="w-4 h-4" />
-                  <span>Deadline: {new Date(gig.deadline).toLocaleDateString()}</span>
-                </div>
-              </div>
+                    {/* Cover Letter */}
+                    <div className="space-y-2">
+                      <Label htmlFor="proposalText">Cover Letter</Label>
+                      <Textarea 
+                        id="proposalText"
+                        rows={6}
+                        {...register("proposalText")}
+                        className={errors.proposalText ? "border-destructive" : ""}
+                        placeholder="Introduce yourself and explain why you're the best fit for this project..."
+                      />
+                      <div className="flex justify-between text-sm">
+                        <span className="text-destructive">{errors.proposalText?.message}</span>
+                        <span className="text-muted-foreground">{proposalText?.length || 0}/2000</span>
+                      </div>
+                    </div>
+
+                    {/* Submit */}
+                    <Button 
+                      type="submit" 
+                      className="w-full btn-gradient"
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? (
+                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Submitting...</>
+                      ) : (
+                        "Submit Proposal"
+                      )}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
             </div>
 
-            {/* Proposal Form */}
-            <div className="card-elevated p-6 rounded-xl">
-              <h2 className="font-semibold text-xl text-foreground mb-6">
-                Submit Proposal
-              </h2>
-
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                {/* Bid Price */}
-                <div className="space-y-2">
-                  <Label htmlFor="bidPrice">Your Bid Price ($)</Label>
-                  <Input
-                    id="bidPrice"
-                    type="number"
-                    step="0.01"
-                    {...register("bidPrice", { valueAsNumber: true })}
-                    className={errors.bidPrice ? "border-destructive" : ""}
-                  />
-                  {errors.bidPrice && (
-                    <p className="text-sm text-destructive">
-                      {errors.bidPrice.message}
-                    </p>
-                  )}
-                </div>
-
-                {/* Delivery Time */}
-                <div className="space-y-2">
-                  <Label htmlFor="deliveryTime">Delivery Time (Days)</Label>
-                  <Input
-                    id="deliveryTime"
-                    type="number"
-                    {...register("deliveryTime", { valueAsNumber: true })}
-                    className={errors.deliveryTime ? "border-destructive" : ""}
-                  />
-                  {errors.deliveryTime && (
-                    <p className="text-sm text-destructive">
-                      {errors.deliveryTime.message}
-                    </p>
-                  )}
-                </div>
-
-                {/* Proposal Text */}
-                <div className="space-y-2">
-                  <Label htmlFor="proposalText">Proposal Message</Label>
-                  <Textarea
-                    id="proposalText"
-                    rows={5}
-                    placeholder="Explain why you're the perfect fit for this project. Include your experience, approach, and any relevant samples..."
-                    {...register("proposalText")}
-                    className={errors.proposalText ? "border-destructive" : ""}
-                  />
-                  {errors.proposalText && (
-                    <p className="text-sm text-destructive">
-                      {errors.proposalText.message}
-                    </p>
-                  )}
-                  <p className="text-sm text-muted-foreground">
-                    {watch("proposalText")?.length || 0}/2000 characters
-                  </p>
-                </div>
-
-                {/* Demo Upload */}
-                <div className="space-y-2">
-                  <Label htmlFor="demoFile">Demo Audio (Optional)</Label>
-                  <div className="border-2 border-dashed border-input rounded-lg p-4 text-center">
-                    <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                    <input
-                      id="demoFile"
-                      type="file"
-                      accept="audio/*"
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-                    <label htmlFor="demoFile" className="cursor-pointer">
-                      <span className="text-sm font-medium text-primary">
-                        {selectedFile ? selectedFile.name : 'Click to upload demo'}
-                      </span>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        MP3, WAV, or M4A files up to 10MB
-                      </p>
-                    </label>
+            {/* Sidebar - 1/3 */}
+            <div className="space-y-5">
+              {/* Gig Info */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Gig Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <h4 className="font-semibold line-clamp-2">{gig.title}</h4>
                   </div>
-                </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <DollarSign className="w-4 h-4 text-primary" />
+                    <span className="font-semibold">${gig.budget}</span>
+                    <span className="text-muted-foreground">budget</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Calendar className="w-4 h-4" />
+                    <span>Posted {timeAgo(gig.created_at)}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Clock className="w-4 h-4" />
+                    <span>Deadline: {formatDate(gig.deadline)}</span>
+                  </div>
+                </CardContent>
+              </Card>
 
-                {/* Pricing Summary */}
-                {bidPrice > 0 && (
-                  <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+              {/* Skills */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Requirements</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm">
+                      {gig.language}
+                    </span>
+                    <span className="bg-secondary/10 text-secondary px-3 py-1 rounded-full text-sm">
+                      {gig.accent}
+                    </span>
+                    <span className="bg-accent/10 text-accent px-3 py-1 rounded-full text-sm">
+                      {gig.tone}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Earnings Calculator */}
+              {bidPrice > 0 && (
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardHeader>
+                    <CardTitle className="text-base">Your Earnings</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span>Your Bid:</span>
-                      <span className="font-semibold">${bidPrice.toFixed(2)}</span>
+                      <span className="text-muted-foreground">Your Bid</span>
+                      <span>${bidPrice.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span>Platform Fee (10%):</span>
-                      <span className="font-semibold">
-                        ${calculatePlatformFee(bidPrice).toFixed(2)}
-                      </span>
+                      <span className="text-muted-foreground">Platform Fee (10%)</span>
+                      <span>-${platformFee.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between text-lg font-semibold border-t pt-2">
-                      <span>Client Pays:</span>
-                      <span>${calculateTotal(bidPrice).toFixed(2)}</span>
+                    <div className="border-t pt-2 flex justify-between font-semibold">
+                      <span>You'll Receive</span>
+                      <span className="text-primary">${youReceive.toFixed(2)}</span>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Platform fee covers payment processing and escrow services
-                    </p>
-                  </div>
-                )}
-
-                {/* Delivery Timeline */}
-                {deliveryTime > 0 && (
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Clock className="w-4 h-4" />
-                      <span>
-                        You'll deliver in {deliveryTime} day{deliveryTime !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Submit Button */}
-                <Button
-                  type="submit"
-                  className="w-full btn-gradient"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? 'Submitting Proposal...' : 'Submit Proposal'}
-                </Button>
-
-                <p className="text-sm text-muted-foreground text-center">
-                  By submitting, you agree to our terms and confirm this proposal is accurate
-                </p>
-              </form>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         </div>
       </main>
+
       <Footer />
     </div>
   );

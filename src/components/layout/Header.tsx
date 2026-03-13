@@ -186,6 +186,18 @@ const Header = () => {
 
                 <NavigationMenuItem>
                   <Link 
+                    to="/browse-gigs" 
+                    className={cn(
+                      navigationMenuTriggerStyle(), 
+                      "bg-transparent font-medium text-[15px] hover:bg-primary/5 dark:hover:bg-primary/10 dark:hover:backdrop-blur-md dark:hover:bg-opacity-20 dark:border dark:border-transparent dark:hover:border-primary/20 transition-all duration-200"
+                    )}
+                  >
+                    Browse Gigs
+                  </Link>
+                </NavigationMenuItem>
+
+                <NavigationMenuItem>
+                  <Link 
                     to="/how-it-works" 
                     className={cn(
                       navigationMenuTriggerStyle(), 
@@ -320,16 +332,13 @@ const Header = () => {
                 <Link
                   to="/browse-gigs"
                   onClick={() => setIsMenuOpen(false)}
-                  className="px-4 py-3.5 text-lg font-semibold hover:bg-accent rounded-xl transition-all flex items-center justify-between group text-left w-full animate-in fade-in slide-in-from-left duration-500"
+                  className="px-4 py-3.5 text-lg font-semibold hover:bg-accent rounded-xl transition-all flex items-center gap-3 animate-in fade-in slide-in-from-left duration-500"
                   style={{ animationDelay: '200ms' }}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="bg-primary/10 p-2 rounded-lg group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                      <Briefcase className="w-5 h-5" />
-                    </div>
-                    <span>Find Work</span>
+                  <div className="bg-primary/10 p-2 rounded-lg group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                    <Briefcase className="w-5 h-5" />
                   </div>
-                  <ChevronDown className="w-5 h-5 -rotate-90 text-muted-foreground" />
+                  Browse Gigs
                 </Link>
                 <Link
                   to="/how-it-works"
